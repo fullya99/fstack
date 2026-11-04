@@ -1,150 +1,149 @@
-# HANDOFF : le test « prêt pour un contexte neuf »
+# HANDOFF: the "ready for a fresh context" test
 
-> Repartir à froid est irréversible côté contexte, que ce soit par le `/clear` de Claude Code ou
-> par le mécanisme équivalent d'un autre agent. Ce qui n'a pas été écrit est perdu. Cette page est
-> la barrière de sécurité avant de le déclencher.
+> Starting cold is irreversible for context, whether through Claude Code's `/clear` or another
+> agent's equivalent. Whatever was not written is lost. This page is the safety barrier before
+> you trigger it.
 
-## Le test, en une phrase
+## The test, in one sentence
 
-> Si cette conversation disparaissait maintenant, une session neuve pourrait-elle reprendre le
-> travail exactement là où il en est, sans poser de question à l'utilisateur ?
+> If this conversation disappeared now, could a new session pick the work up exactly where it
+> stands, without asking the user a question?
 
-Tant que la réponse est non, la clôture n'est pas finie. Et ça ne se remplace pas par un résumé
-plus long dans le chat, vu que le chat va disparaître.
-
----
-
-## Simulation de reprise à froid
-
-La seule vérification qui vaut vraiment, c'est de te relire comme si tu ne savais rien.
-
-1. Rouvre `TODOS.md`, section « État à la reprise », et ne lis que ça.
-2. Demande-toi quelle est ta toute prochaine action, concrètement, quel fichier tu ouvres.
-   Si la réponse est claire, le bloc fait son travail. Si tu hésites, il manque une information,
-   ajoute-la maintenant.
-3. Ouvre `CODEMAP.md` et vérifie que les fichiers cités à l'étape 2 y figurent bien.
-4. Vérifie qu'un piège rencontré cette session est écrit quelque part, dans la fiche `docs/` du
-   module concerné ou dans `docs/pieges/` ou les zones sensibles du `CODEMAP.md` (un seul des deux par projet, `docs/pieges/` s'il existe). Sinon il sera re-découvert plus tard,
-   au prix des mêmes erreurs.
-5. Confronte `git status` et `git log -3` à ce que raconte le CHANGELOG.
-
-Un écart trouvé ici est toujours un vrai défaut de clôture. Tu le corriges, tu ne le notes pas
-pour plus tard.
+As long as the answer is no, the debrief is not done. A longer summary in the chat does not fix
+that, since the chat is going away.
 
 ---
 
-## Checklist bloquante
+## Cold-resume simulation
 
-### Exactitude
-- [ ] Les 3 piliers reflètent l'état vérifié, pas l'état supposé.
-- [ ] Aucune contradiction entre piliers. Le cas classique : TODOS annonce une tâche faite que
-      CODEMAP décrit encore comme absente.
-- [ ] Aucun chemin, commande ou ressource cité qui n'existe plus.
-- [ ] Aucune affirmation connue-fausse laissée « pour plus tard ».
+The only check that really counts is to reread yourself as if you knew nothing.
 
-### Complétude
-- [ ] Le bloc « État à la reprise » est réécrit à la date du jour.
-- [ ] Tout travail entamé et pas fini a une tâche explicite dans TODOS, avec ses fichiers.
-- [ ] Le travail à moitié appliqué est signalé : migration partielle, refactor interrompu,
-      feature derrière un flag, fichier laissé dans un état intermédiaire.
-- [ ] Chaque décision structurante prise cette session a son ADR dans `docs/decisions/`.
-- [ ] Chaque piège rencontré est écrit, dans la fiche du module ou dans les zones sensibles du
-      CODEMAP. C'est le gain le plus direct de la clôture.
-- [ ] Chaque préférence exprimée par l'utilisateur est dans `CLAUDE.md`, et rien de volatile n'y
-      a été ajouté au passage.
-- [ ] Les modules et features touchés ont une fiche `docs/` à jour et indexée.
+1. Reopen `TODOS.md`, the "Resume state" section, and read only that.
+2. Ask yourself what your very next action is, concretely, which file you open. If the answer is
+   clear, the block does its job. If you hesitate, information is missing, add it now.
+3. Open `CODEMAP.md` and check that the files cited in step 2 are listed there.
+4. Check that any pitfall met this session is written down somewhere: in the `docs/` page of the
+   module concerned, or in `docs/pitfalls/`, or in the sensitive zones of `CODEMAP.md` (only one
+   of the two per project, `docs/pitfalls/` if it exists). Otherwise it will be rediscovered
+   later, at the price of the same mistakes.
+5. Compare `git status` and `git log -3` with what the CHANGELOG says.
 
-### Propreté
-- [ ] Ce qui est obsolète est dans `archives/`, avec en-tête et ligne d'index.
-- [ ] Aucune suppression silencieuse.
-- [ ] Les statuts `🔴` de `docs/` ont été traités. Les `🟡` sont vérifiés ou datés d'aujourd'hui.
-- [ ] `ctx-audit.sh --budget` ne rend aucun `[!!]`, chaque `[!]` a son geste ou sa tâche datée.
-- [ ] Aucune section de session ni case cochée dans TODOS, ni état ni récit dans `CLAUDE.md`.
+A gap found here is always a real debrief defect. Fix it, do not note it for later.
 
-### Sécurité
-- [ ] Aucun secret dans un fichier tracké : clé, token, mot de passe, URL signée.
-- [ ] Les fichiers d'environnement restent ignorés.
-- [ ] `git status` conforme à l'intention, rien d'oublié, rien de parasite.
+---
 
-### Multi-niveaux
-- [ ] Chaque niveau touché a été mis à jour : racine, sous-projet, configuration partagée.
-- [ ] Le parent pointe vers la doc des enfants, il ne l'a pas absorbée.
-- [ ] Chaque zone touchée a sa carte à jour, et chaque zone est citée dans le CODEMAP racine.
+## Blocking checklist
 
-### Ce qui prouve une case cochée
+### Accuracy
+- [ ] The 3 pillars reflect the verified state, not the assumed one.
+- [ ] No contradiction between pillars. The classic case: TODOS announces a finished task that
+      CODEMAP still describes as missing.
+- [ ] No cited path, command or resource that no longer exists.
+- [ ] No known-false claim left "for later".
 
-Une case se coche sur une preuve fraîche de cette session, jamais sur un souvenir.
+### Completeness
+- [ ] The "Resume state" block is rewritten with today's date.
+- [ ] Any work started and not finished has an explicit task in TODOS, with its files.
+- [ ] Half-applied work is flagged: partial migration, interrupted refactor, feature behind a
+      flag, file left in an intermediate state.
+- [ ] Every structural decision made this session has its ADR in `docs/decisions/`.
+- [ ] Every pitfall met is written down, in the module page or in the sensitive zones of the
+      CODEMAP. This is the most direct gain of the debrief.
+- [ ] Every preference the user expressed is in `CLAUDE.md`, and nothing volatile was added to it
+      along the way.
+- [ ] The modules and features touched have an up-to-date, indexed `docs/` page.
 
-| Affirmation | Preuve exigée | Ce qui ne suffit pas |
+### Cleanliness
+- [ ] What is obsolete is in `archives/`, with a header and an index line.
+- [ ] No silent deletion.
+- [ ] The `🔴` statuses in `docs/` have been handled. The `🟡` are verified or dated today.
+- [ ] `ctx-audit.sh --budget` returns no `[!!]`, each `[!]` has its action or a dated task.
+- [ ] No session section or ticked box in TODOS, no state or narrative in `CLAUDE.md`.
+
+### Security
+- [ ] No secret in a tracked file: key, token, password, signed URL.
+- [ ] Environment files stay ignored.
+- [ ] `git status` matches the intent, nothing forgotten, nothing stray.
+
+### Multi-level
+- [ ] Every level touched has been updated: root, sub-project, shared configuration.
+- [ ] The parent points to the children's docs, it has not absorbed them.
+- [ ] Every zone touched has its map up to date, and every zone is cited in the root CODEMAP.
+
+### What proves a ticked box
+
+A box is ticked on fresh proof from this session, never on a memory.
+
+| Claim | Proof required | What is not enough |
 |---|---|---|
-| un contrôle est vert | son code nu, lu sur la commande elle-même | un `tail` en bout de tube, qui rend 0, ou un code 2 (rien regardé) |
-| la doc dit vrai | `ctx-verite.sh --strict` rend 0 | une relecture de mémoire |
-| c'est commité | `git log -1 --stat` liste les fichiers de la clôture | `git status` propre (un autre commit a pu les emporter) |
-| c'est poussé | `git rev-parse HEAD` égale `git rev-parse @{u}` | un push lancé dont on n'a pas lu le code |
-| un agent a fini | son diff relu, sa commande de fin rejouée | son rapport « Fait » |
-| rien n'utilise X | la commande qui l'aurait trouvé, et ce qu'elle a balayé | un `grep` qui saute les fichiers ignorés par git |
-| l'opérateur a validé | sa phrase, sur ce point précis | un « ok » donné sur autre chose |
+| a check is green | its bare exit code, read from the command itself | a `tail` at the end of a pipe, which returns 0, or an exit code 2 (nothing was inspected) |
+| the docs are true | `ctx-truth.sh --strict` returns 0 | a reread from memory |
+| it is committed | `git log -1 --stat` lists the debrief files | a clean `git status` (another commit may have taken them) |
+| it is pushed | `git rev-parse HEAD` equals `git rev-parse @{u}` | a push that was started and whose exit code was not read |
+| an agent is done | its diff reread, its final command replayed | its "Done" report |
+| nothing uses X | the command that would have found it, and what it swept | a `grep` that skips git-ignored files |
+| the operator approved | their sentence, on that exact point | an "ok" given on something else |
 
-### Les excuses qui font sauter une clôture
+### The excuses that skip a debrief
 
-| Ce qu'on se dit | Ce qui est vrai |
+| What we tell ourselves | What is true |
 |---|---|
-| « Je l'ai vu passer tout à l'heure » | Une sortie vue avant la dernière édition ne prouve rien sur l'état actuel |
-| « C'est une petite session, pas besoin » | La phase 4 et la phase 5 se jouent toujours, une ligne suffit |
-| « Je le noterai à la prochaine clôture » | Il n'y a pas de prochaine fois, il y a un redémarrage qui l'efface |
-| « Le sous-agent a dit que c'était bon » | Son rapport est une affirmation, le diff est la preuve |
+| "I saw it pass earlier" | Output seen before the last edit proves nothing about the current state |
+| "It's a small session, no need" | Phase 4 and phase 5 always run, one line is enough |
+| "I'll note it at the next debrief" | There is no next time, there is a restart that wipes it |
+| "The sub-agent said it was fine" | Its report is a claim, the diff is the proof |
 
 ---
 
-## Anti-patterns de passation
+## Handover anti-patterns
 
-| Anti-pattern | Pourquoi ça casse | À la place |
+| Anti-pattern | Why it breaks | Instead |
 |---|---|---|
-| « Continuer le refactor » | Au retour, personne ne sait où il en était | « Finir l'extraction de `parse()` vers `lib/parser.ts`, 3 appelants restent à migrer : `a.ts:12`, `b.ts:88`, `c.ts:40` » |
-| Résumé chronologique de la session | La suite ne se déduit pas du récit | Un état : ce qui marche, ce qui est en cours, la prochaine action |
-| Doc écrite depuis le souvenir | Le souvenir garde un état intermédiaire, pas l'état final | Vérifier le fichier, la commande, le service |
-| Redater une fiche sans la relire | `docs/` devient un piège, le lecteur fait confiance à tort | Relire, corriger, puis dater |
-| Empiler les « État à la reprise » | Le lecteur ne sait plus lequel fait foi | Un seul bloc, réécrit |
-| Tout empiler dans `CLAUDE.md` | Il est chargé à chaque session, le signal se noie et le contexte se paie tout le temps | Une décision en ADR, un piège dans la fiche du module, une préférence seulement si elle est vraie en permanence |
-| Garder le faux « pour plus tard » | Il n'y a pas de plus tard, il y a un redémarrage | Corriger ou archiver, maintenant |
-| Reporter la clôture « à la fin » | La fin arrive par manque de contexte, au pire moment | Clôturer quand le travail est cohérent, pas quand le contexte est plein |
-| Empiler le bloc de reprise en journal | Le lecteur paie 40 000 tokens avant de savoir quoi faire | Réécrire depuis l'état courant, 40 lignes, classer ce qui sort |
-| Un compte-rendu de session dans TODOS | TODOS ne garde que le futur | L'entrée va au CHANGELOG |
-| Tenir le seuil en effaçant un piège | Le piège revient au prix d'une session | Il descend dans la carte de sa zone ou la fiche du module |
+| "Continue the refactor" | On return, nobody knows where it stood | "Finish extracting `parse()` to `lib/parser.ts`, 3 callers left to migrate: `a.ts:12`, `b.ts:88`, `c.ts:40`" |
+| Chronological session summary | What comes next cannot be deduced from the story | A state: what works, what is in progress, the next action |
+| Docs written from memory | Memory keeps an intermediate state, not the final one | Check the file, the command, the service |
+| Redating a page without rereading it | `docs/` becomes a trap, the reader trusts it wrongly | Reread, fix, then date |
+| Stacking "Resume state" blocks | The reader no longer knows which one counts | One block, rewritten |
+| Piling everything into `CLAUDE.md` | It loads every session, the signal drowns and the context is paid for all the time | A decision in an ADR, a pitfall in the module page, a preference only if it is always true |
+| Keeping the false claim "for later" | There is no later, there is a restart | Fix or archive, now |
+| Postponing the debrief "to the end" | The end comes from running out of context, at the worst moment | Debrief when the work is coherent, not when the context is full |
+| Stacking the resume block into the log | The reader pays 40,000 tokens before knowing what to do | Rewrite from the current state, 40 lines, file away what falls out |
+| A session report in TODOS | TODOS keeps only the future | The entry goes to the CHANGELOG |
+| Meeting the threshold by deleting a pitfall | The pitfall comes back at the price of a session | It moves down into its zone map or the module page |
 
 ---
 
-## Quand clôturer
+## When to debrief
 
-Avant tout redémarrage à froid volontaire, évidemment. Mais aussi quand une unité de travail
-cohérente est terminée, même si la session continue. Quand le contexte approche de la saturation, avant que la
-qualité baisse et pas après. Avant une interruption longue. Avant de passer à un sujet sans rapport.
+Before any deliberate cold restart, obviously. But also when a coherent unit of work is done,
+even if the session continues. When the context nears saturation, before quality drops and not
+after. Before a long interruption. Before switching to an unrelated subject.
 
-Une clôture précoce coûte quelques minutes. Une clôture manquée coûte une re-découverte complète,
-et parfois du travail refait.
+An early debrief costs a few minutes. A missed one costs a full rediscovery, and sometimes
+redone work.
 
 ---
 
-## Au retour, la reprise
+## On return, the brief
 
-Ordre de lecture, c'est le mode RELANCE du skill.
+Reading order, this is the BRIEF mode of the skill.
 
-1. `CLAUDE.md`, les règles et les préférences durables.
-2. Lecture partielle, jamais un pilier entier :
+1. `CLAUDE.md`, the lasting rules and preferences.
+2. Partial reading, never a whole pillar:
 
    ```bash
-   awk '/^## /{n++} n<=1' TODOS.md      # le bloc de reprise, rien d'autre
-   grep -n '^## ' CODEMAP.md            # le plan, puis la section utile
-   awk '/^## /{n++} n<=3' CHANGELOG.md  # les 3 dernières entrées
+   awk '/^## /{n++} n<=1' TODOS.md      # the resume block, nothing else
+   grep -n '^## ' CODEMAP.md            # the outline, then the useful section
+   awk '/^## /{n++} n<=3' CHANGELOG.md  # the last 3 entries
    ```
-3. Puis la carte de la seule zone concernée par la tâche.
-4. Les fiches `docs/` des seuls modules concernés, et l'ADR si tu reviens sur un choix tranché.
-5. `git log --oneline -10` et `git status -s`, pour confronter au réel.
+3. Then the map of the one zone the task concerns.
+4. The `docs/` pages of the modules concerned only, and the ADR if you are revisiting a settled
+   choice.
+5. `git log --oneline -10` and `git status -s`, to compare with reality.
 
-Ne charge pas `archives/`. Ne lis pas tout `docs/`. Ne relis pas tout le CHANGELOG. La reprise
-doit coûter peu de contexte, sinon elle annule le bénéfice du redémarrage.
+Do not load `archives/`. Do not read all of `docs/`. Do not reread the whole CHANGELOG. The
+brief must cost little context, otherwise it cancels the benefit of the restart.
 
-Restitue en dix lignes maximum : où on en est, ce qui est en cours, la prochaine étape, les
-pièges. Toute incohérence entre la doc et le dépôt se corrige avant de coder. C'est le symptôme
-d'une clôture précédente incomplète, et c'est le seul moment où on a pas encore payé cher pour
-la réparer.
+Report in ten lines at most: where we stand, what is in progress, the next step, the pitfalls.
+Any inconsistency between the docs and the repo gets fixed before coding. It is the symptom of
+an incomplete earlier debrief, and the only moment when the repair has not yet been paid for dearly.

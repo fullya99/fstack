@@ -1,99 +1,95 @@
-# ZONES : découper la carte sans découper l'état
+# ZONES: splitting the map without splitting the state
 
-> Une zone donne sa propre carte à un répertoire trop gros pour tenir dans le CODEMAP racine.
-> L'état et le journal restent uniques, une zone n'a jamais de TODOS ni de CHANGELOG à elle.
+> A zone gives its own map to a directory too big to fit in the root CODEMAP. State and log stay
+> single, a zone never has its own TODOS or CHANGELOG.
 
-## Ce qu'est une zone, et ce qu'elle n'est pas
+## What a zone is, and what it is not
 
-Une zone est un répertoire qui porte `CODEMAP.md`, et au besoin `CLAUDE.md`. Rien d'autre. Elle
-se distingue d'un niveau autonome, qui porte les trois piliers et se clôture à part, cas d'un
-package de monorepo ou d'un sous-projet livré séparément.
+A zone is a directory that carries `CODEMAP.md`, and optionally `CLAUDE.md`. Nothing else. It
+differs from a standalone level, which carries the three pillars and gets its own debrief, as with
+a monorepo package or a sub-project shipped separately.
 
-| | Zone | Niveau autonome | Fiche `docs/modules/` |
+| | Zone | Standalone level | `docs/modules/` page |
 |---|---|---|---|
-| Ce que ça porte | `CODEMAP.md`, `CLAUDE.md` facultatif | les 3 piliers complets | une page de connaissance |
-| Se clôture | dans la clôture du parent | à part, le parent pointe | mise à jour en phase 3 |
-| Quand on le choisit | un répertoire de code trop gros pour le CODEMAP racine | un sous-projet qui a sa propre vie | un sujet qui mérite d'être expliqué, pas rangé |
+| What it carries | `CODEMAP.md`, optional `CLAUDE.md` | the 3 full pillars | a knowledge page |
+| Debriefed | within the parent's debrief | separately, the parent points | updated in phase 3 |
+| When to pick it | a code directory too big for the root CODEMAP | a sub-project with a life of its own | a subject worth explaining, not filing |
 
-`ctx-audit.sh` distingue niveau et zone par la présence des trois piliers : un `CODEMAP.md` seul
-est une zone, les trois ensemble sont un niveau, section 1b de l'audit.
+`ctx-audit.sh` tells level from zone by the presence of the three pillars: a lone `CODEMAP.md` is
+a zone, all three together are a level, section 1b of the audit.
 
-## Quand créer une zone
+## When to create a zone
 
-Un répertoire est candidat s'il porte au moins 25 fichiers, ou s'il occupe plus de 30 lignes du
-CODEMAP racine, ou s'il a sa propre fiche `docs/modules/` de plus de 100 lignes. Le script
-propose, `ctx-audit.sh --budget` liste les candidats, le skill décide.
+A directory is a candidate if it holds at least 25 files, or takes more than 30 lines of the root
+CODEMAP, or has its own `docs/modules/` page of more than 100 lines. The script proposes,
+`ctx-audit.sh --budget` lists the candidates, the skill decides.
 
-Une zone par sujet qu'on a en tête en même temps. Jamais une zone de dix lignes recousue pour
-faire un chiffre, ces lignes restent au CODEMAP racine ou rejoignent une zone voisine.
+One zone per subject you hold in mind at the same time. Never a ten-line zone stitched together to
+make a number, those lines stay in the root CODEMAP or join a neighboring zone.
 
-Selon la taille du projet : petit, aucune zone. Moyen, une zone là où le CODEMAP racine déborde,
-pas avant. Grand, des zones dès l'INIT, le CODEMAP racine naît comme un index.
+By project size: small, no zone. Medium, a zone where the root CODEMAP overflows, not before.
+Large, zones from SETUP, the root CODEMAP is born as an index.
 
-## Ce que porte une zone
+## What a zone carries
 
-**`<zone>/CODEMAP.md`**, obligatoire, gabarit `templates/CODEMAP-zone.md`. Rôle en une phrase,
-arborescence de la zone, points d'entrée, flux, pièges. C'est ici que vont les zones sensibles qui
-concernent la zone, plus dans le CODEMAP racine. Cible 150 lignes.
+**`<zone>/CODEMAP.md`**, mandatory, template `templates/CODEMAP-zone.md`. Role in one sentence,
+zone tree, entry points, flows, pitfalls. This is where the sensitive zones that concern the zone
+go, no longer the root CODEMAP. Target 150 lines.
 
-**`<zone>/CLAUDE.md`**, facultatif, gabarit `templates/CLAUDE-zone.md`, 30 lignes au plus.
-Seulement les règles qui doivent tenir quand on édite dans la zone, formulées comme des faits sur
-la zone.
+**`<zone>/CLAUDE.md`**, optional, template `templates/CLAUDE-zone.md`, 30 lines at most. Only the
+rules that must hold when editing in the zone, worded as facts about the zone.
 
 ```bash
-bash "$SKILL/scripts/ctx-init.sh" --zone src/<dir>                 # pose la carte
-bash "$SKILL/scripts/ctx-init.sh" --zone src/<dir> --with-claude   # pose la carte et les règles
+bash "$SKILL/scripts/ctx-init.sh" --zone src/<dir>                 # creates the map
+bash "$SKILL/scripts/ctx-init.sh" --zone src/<dir> --with-claude   # creates the map and the rules
 ```
 
-## Ce qui reste à la racine
+## What stays at the root
 
-Les interdits sans exception, la sécurité, ce qui vaut partout, jamais seulement dans une zone.
-Un agent qui travaille ailleurs dans le dépôt ne verrait pas une règle de zone, c'est le piège de
-la feuille paresseuse : une contrainte qui doit tenir partout et qu'on n'a écrite que dans
-`<zone>/CLAUDE.md` n'existe pour personne d'autre.
+The no-exception prohibitions, security, whatever holds everywhere, never only in a zone. An agent
+working elsewhere in the repo would not see a zone rule, this is the lazy-leaf trap: a constraint
+that must hold everywhere and was only written in `<zone>/CLAUDE.md` does not exist for anyone
+else.
 
-Le piège de précédence, documenté sur un cas réel (Knack, 2026-05-22,
-https://getknack.ai/blog/agents-md-monorepo) : une règle racine disait « toujours lancer la suite
-complète », une règle de service disait « ce service filtre ses tests ». La règle de service était
-plus proche et aurait dû l'emporter sur le papier, le modèle a suivi la racine parce qu'elle était
-formulée à l'impératif. Conséquence pour l'écriture : la racine ne porte pas d'impératif qui
-contredit une zone, et une zone formule ses règles comme des faits sur elle-même, jamais comme des
-ordres généraux.
+The precedence trap, documented on a real case (Knack, 2026-05-22,
+https://getknack.ai/blog/agents-md-monorepo): a root rule said "always run the full suite", a
+service rule said "this service filters its tests". The service rule was closer and should have
+won on paper, the model followed the root because it was worded as an imperative. Consequence for
+writing: the root carries no imperative that contradicts a zone, and a zone words its rules as
+facts about itself, never as general orders.
 
-## Ce que chaque lecteur charge
+## What each reader loads
 
-Pour `<zone>/CLAUDE.md` :
+For `<zone>/CLAUDE.md`:
 
-| Lecteur | Comportement |
+| Reader | Behavior |
 |---|---|
-| Claude Code | à la demande, quand un fichier de la zone est lu, jamais avant (doc officielle, memory.md) |
-| Codex | `AGENTS.md` au même endroit, fusionné racine vers cwd, 32 Kio cumulés pour tous les fichiers du chemin |
-| Hermes | rien ne le charge |
-| OpenClaw | rien ne le charge |
+| Claude Code | on demand, when a file in the zone is read, never before (official docs, memory.md) |
+| Codex | `AGENTS.md` in the same place, merged root to cwd, 32 KiB cumulative across all files on the path |
+| Hermes | nothing loads it |
+| OpenClaw | nothing loads it |
 
-Pour `<zone>/CODEMAP.md` : tout le monde, à la demande, c'est un fichier `.md` ordinaire, aucun
-mécanisme spécial ne le charge ni ne le bloque.
+For `<zone>/CODEMAP.md`: everyone, on demand, it is an ordinary `.md` file, no special mechanism
+loads or blocks it.
 
-Conséquence directe : la carte est la partie portable de la zone, elle voyage sur tous les
-lecteurs. Les règles de zone sont un confort propre à Claude Code et Codex, pas une garantie.
-Une contrainte qui doit tenir sur tous les lecteurs va à la racine, jamais seulement en
-`<zone>/CLAUDE.md`.
+Direct consequence: the map is the portable part of the zone, it travels across all readers. Zone
+rules are a convenience specific to Claude Code and Codex, not a guarantee. A constraint that must
+hold across all readers goes at the root, never only in `<zone>/CLAUDE.md`.
 
-## Le CODEMAP racine après découpe
+## The root CODEMAP after the split
 
-Il devient un index. Une table « Zones » qui pointe, sans recopier :
+It becomes an index. A "Zones" table that points, without copying:
 
-| Zone | Rôle | Carte |
+| Zone | Role | Map |
 |---|---|---|
-| `src/api` | expose les routes HTTP | `src/api/CODEMAP.md` |
+| `src/api` | exposes the HTTP routes | `src/api/CODEMAP.md` |
 
-Plus une arborescence d'un niveau, les points d'entrée globaux, le flux global et les zones
-sensibles qui ne relèvent d'aucune zone. Une zone sensible qui concerne une zone précise vit dans
-sa carte, pas ici.
+Plus a one-level tree, the global entry points, the global flow and the sensitive zones that
+belong to no zone. A sensitive zone that concerns a specific zone lives in its map, not here.
 
 ## Maintenance
 
-À chaque clôture, la carte de chaque zone touchée se met à jour dans la même passe que les trois
-piliers. Une zone qui dépasse 250 lignes se scinde en deux. Une zone dont le répertoire disparaît
-part en archive par `$SKILL/scripts/ctx-archive.sh`, jamais à la main, et la table « Zones » du
-CODEMAP racine perd sa ligne dans le même mouvement.
+At each debrief, the map of every zone touched is updated in the same pass as the three pillars. A
+zone that exceeds 250 lines splits in two. A zone whose directory disappears goes to the archive
+through `$SKILL/scripts/ctx-archive.sh`, never by hand, and the root CODEMAP's "Zones" table loses
+its row in the same move.

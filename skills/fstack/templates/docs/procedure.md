@@ -1,53 +1,53 @@
-> **Statut** : ✅ à jour, vérifié le {{DATE}}
-> **Type** : procédure
-> **Portée** : <ce que la procédure opère>
-> **Voir aussi** : `docs/modules/<...>.md`
+> **Status**: ✅ up to date, checked on {{DATE}}
+> **Type**: procedure
+> **Scope**: <what the procedure operates>
+> **See also**: `docs/modules/<...>.md`
 
-# Procédure, <nom>
+# Procedure, <name>
 
-**But** : <ce qu'on obtient à la fin.>
-**Quand l'exécuter** : <le déclencheur.>
-**Durée et risque** : <~N minutes, réversible, ou irréversible avec <quoi>>
+**Goal**: <what you get at the end.>
+**When to run it**: <the trigger.>
+**Duration and risk**: <~N minutes, reversible, or irreversible with <what>>
 
-## Prérequis
+## Prerequisites
 
-- [ ] <accès, droit, outil installé, variable configurée>
-- [ ] <état attendu du système avant de commencer>
+- [ ] <access, right, tool installed, variable set>
+- [ ] <expected state of the system before starting>
 
-## Étapes
+## Steps
 
-<Pour chaque étape : la commande exacte, et comment savoir qu'elle a réussi. Une procédure qui
-ne dit pas comment vérifier chaque étape n'est pas rejouable.>
+<For each step: the exact command, and how to know it succeeded. A procedure that does not say
+how to check each step cannot be replayed.>
 
-1. **<étape>**
+1. **<step>**
    ```bash
-   <commande>
+   <command>
    ```
-   ✅ Attendu : <sortie ou état observable>
+   ✅ Expected: <output or observable state>
 
-2. **<étape>**
+2. **<step>**
    ```bash
-   <commande>
+   <command>
    ```
-   ✅ Attendu : <sortie ou état observable>
+   ✅ Expected: <output or observable state>
 
-## Vérification finale
+## Final check
 
 ```bash
-<commande de contrôle de bout en bout>
+<end-to-end check command>
 ```
 
 ## Rollback
 
-<Comment défaire, étape par étape. Si ce n'est pas réversible, dis-le ici en toutes lettres,
-avec ce qui est perdu.>
+<How to undo, step by step. If it is not reversible, say so here in plain words, with what is
+lost.>
 
 ```bash
-<commande>
+<command>
 ```
 
-## Pièges
+## Pitfalls
 
-| Symptôme | Cause | Solution |
+| Symptom | Cause | Fix |
 |---|---|---|
-| <message d'erreur ou comportement> | <la cause réelle> | <ce qu'il faut faire> |
+| <error message or behavior> | <the real cause> | <what to do> |

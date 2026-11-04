@@ -1,71 +1,70 @@
 #!/usr/bin/env bash
 #
-# ctx-archive.sh : sort un document de la circulation, en une passe et sans en
-# oublier une etape.
+# ctx-archive.sh: takes a document out of circulation, in one pass and without
+# forgetting a step.
 #
-# Le geste faisait quatre etapes a la main : git mv, en-tete, ligne d'index,
-# correction des liens. La quatrieme est celle qu'on oublie, et c'est pour ça que
-# l'audit a du inventer une alerte pour la rattraper. Ici tout se fait, ou rien.
+# The gesture used to be four steps by hand: git mv, header, index line, link fixing.
+# The fourth is the one people forget, which is why the audit had to invent an alert
+# to catch it. Here everything is done, or nothing.
 #
-# Usage :
-#   bash ctx-archive.sh --verifier <chemin>
-#   bash ctx-archive.sh <chemin> --raison "..." [--remplace-par "..."] [--dry-run] [--force]
-#   bash ctx-archive.sh <chemin> --raison "..." --resume <fichier> [--remplace-par "..."] [--dry-run]
+# Usage:
+#   bash ctx-archive.sh --verify <path>
+#   bash ctx-archive.sh <path> --reason "..." [--replaced-by "..."] [--dry-run] [--force]
+#   bash ctx-archive.sh <path> --reason "..." --summary <file> [--replaced-by "..."] [--dry-run]
 #
-# --resume : le fichier garde sa place sous forme de resume. Le texte integral part dans
-# les archives, <fichier> est pose a l'ancien chemin, ou {{ARCHIVE}} devient le chemin de
-# l'archive. Les references entrantes restent valides, elles ne bloquent donc pas, et la
-# verification finale controle que le resume est en place. Appel de ctx-rotation.sh --plans.
+# --summary: the file keeps its place as a summary. The full text goes to the archives,
+# <file> is put at the old path, where {{ARCHIVE}} becomes the archive path. Incoming
+# references stay valid, so they do not block, and the final check controls that the
+# summary is in place. Called by ctx-rotation.sh --plans.
 #
-# Le critere d'archivage porte sur les REFERENCES ENTRANTES, pas sur une
-# impression. Pour chaque reference : est-elle operative, quelqu'un a besoin du
-# document pour agir maintenant, ou est-ce du contexte historique, un commentaire
-# qui raconte la provenance ? On archive quand toutes les references restantes
-# sont historiques. Un lien markdown vivant vers le document est operatif par
-# construction, il bloque, et --force ne se prend qu'en connaissance de cause.
+# The archiving criterion is about INCOMING REFERENCES, not about a feeling. For each
+# reference: is it operative, does someone need the document to act now, or is it
+# historical context, a comment that tells where something came from? We archive when
+# all the remaining references are historical. A live markdown link to the document is
+# operative by construction, it blocks, and --force is only for those who know why.
 #
-# La derniere etape est une VERIFICATION : plus aucune occurrence de l'ancien
-# chemin hors des archives, sinon sortie en erreur.
+# The last step is a CHECK: no occurrence of the old path left outside the archives,
+# otherwise exit with an error.
 set -euf
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=ctx-commun.sh
-. "$DIR/ctx-commun.sh"
+# shellcheck source=ctx-common.sh
+. "$DIR/ctx-common.sh"
 
-# Un accent grave litteral dans du code shell est une source de bug silencieux.
-# On le fabrique une fois, on ne l'ecrit jamais.
+# A literal backtick in shell code is a source of silent bugs.
+# We build it once, we never type it.
 BT="$(printf '\140')"
 FENCE="$BT$BT$BT"
 
 ROOT=""
-CIBLE=""
-RAISON=""
-REMPLACE=""
+TARGET=""
+REASON=""
+REPLACED=""
 DRY=0
 FORCE=0
-VERIFIER=0
-RESUME=""
+VERIFY=0
+SUMMARY=""
 
-# Une option a valeur sans valeur : message clair et code 2, pas une sortie muette.
-valeur() { # <option> <nombre d'arguments restants, option comprise>
+# An option with a value but no value: clear message and code 2, not a silent exit.
+needs_value() { # <option> <number of remaining arguments, option included>
   if [ "$2" -lt 2 ]; then
-    echo "$1 attend une valeur" >&2
+    echo "$1 expects a value" >&2
     exit 2
   fi
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --root)         valeur "$1" $#; ROOT="$2"; shift 2 ;;
-    --raison)       valeur "$1" $#; RAISON="$2"; shift 2 ;;
-    --remplace-par) valeur "$1" $#; REMPLACE="$2"; shift 2 ;;
-    --verifier)     valeur "$1" $#; VERIFIER=1; CIBLE="$2"; shift 2 ;;
-    --resume)       valeur "$1" $#; RESUME="$2"; shift 2 ;;
+    --root)         needs_value "$1" $#; ROOT="$2"; shift 2 ;;
+    --reason)       needs_value "$1" $#; REASON="$2"; shift 2 ;;
+    --replaced-by) needs_value "$1" $#; REPLACED="$2"; shift 2 ;;
+    --verify)     needs_value "$1" $#; VERIFY=1; TARGET="$2"; shift 2 ;;
+    --summary)       needs_value "$1" $#; SUMMARY="$2"; shift 2 ;;
     --dry-run)      DRY=1; shift ;;
     --force)        FORCE=1; shift ;;
-    -h|--help)      sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    -*)             echo "Option inconnue : $1" >&2; exit 2 ;;
-    *)              CIBLE="$1"; shift ;;
+    -h|--help)      sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*)             echo "Unknown option: $1" >&2; exit 2 ;;
+    *)              TARGET="$1"; shift ;;
   esac
 done
 
@@ -75,48 +74,48 @@ fi
 ROOT="$(cd "$ROOT" && pwd)"
 cd "$ROOT"
 
-[ -n "$CIBLE" ] || { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
-CIBLE="${CIBLE#./}"
+[ -n "$TARGET" ] || { sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+TARGET="${TARGET#./}"
 
-version_scripts || exit 1
-ARCHIVES="$(conv_lire archives | sed 's|/*$||')"
+scripts_version || exit 1
+ARCHIVES="$(conv_read archives | sed 's|/*$||')"
 if [ -z "$ARCHIVES" ]; then
   ARCHIVES="$(grep -m1 '^archives:' CODEMAP.md 2>/dev/null | sed 's/^archives: *//;s|/*$||' || true)"
 fi
 [ -n "$ARCHIVES" ] || ARCHIVES="archives"
-TODAY="$(ctx_aujourdhui)"
-MOIS="${TODAY%-*}"
-DEST="$ARCHIVES/$MOIS/$CIBLE"
+TODAY="$(ctx_today)"
+MONTH="${TODAY%-*}"
+DEST="$ARCHIVES/$MONTH/$TARGET"
 
-# --- 0. barrieres -------------------------------------------------------------
-[ -e "$CIBLE" ] || { echo "Introuvable : $CIBLE" >&2; exit 1; }
-[ -f "$CIBLE" ] || { echo "$CIBLE n'est pas un fichier. Archive les fichiers un par un." >&2; exit 1; }
-case "$CIBLE" in
-  "$ARCHIVES"/*) echo "$CIBLE est deja dans $ARCHIVES/." >&2; exit 1 ;;
+# --- 0. barriers -------------------------------------------------------------
+[ -e "$TARGET" ] || { echo "Not found: $TARGET" >&2; exit 1; }
+[ -f "$TARGET" ] || { echo "$TARGET is not a file. Archive files one by one." >&2; exit 1; }
+case "$TARGET" in
+  "$ARCHIVES"/*) echo "$TARGET is already in $ARCHIVES/." >&2; exit 1 ;;
 esac
-if [ -n "$RESUME" ] && [ ! -f "$RESUME" ]; then
-  echo "--resume : fichier introuvable : $RESUME" >&2; exit 1
+if [ -n "$SUMMARY" ] && [ ! -f "$SUMMARY" ]; then
+  echo "--summary: file not found: $SUMMARY" >&2; exit 1
 fi
-if [ "$VERIFIER" -eq 0 ] && [ -e "$DEST" ]; then
-  echo "$DEST existe deja, l'archivage l'ecraserait. Renomme l'un des deux." >&2; exit 1
+if [ "$VERIFY" -eq 0 ] && [ -e "$DEST" ]; then
+  echo "$DEST already exists, archiving would overwrite it. Rename one of the two." >&2; exit 1
 fi
-case "$(basename "$CIBLE")" in
+case "$(basename "$TARGET")" in
   CODEMAP.md|TODOS.md|CHANGELOG.md|CLAUDE.md|AGENTS.md)
-    echo "$CIBLE est un pilier ou un fichier de regles, il ne s'archive pas." >&2
-    echo "Une section fausse dans un pilier se corrige sur place. Une regle durable" >&2
-    echo "devenue fausse se supprime, elle est pire qu'une regle absente." >&2
+    echo "$TARGET is a pillar or a rules file, it is not archived." >&2
+    echo "A false section in a pillar is fixed in place. A lasting rule" >&2
+    echo "that became false is deleted, it is worse than no rule." >&2
     exit 1 ;;
 esac
-case "$CIBLE" in
+case "$TARGET" in
   docs/README.md|"$ARCHIVES"/README.md)
-    echo "$CIBLE est un index. Un index ne s'archive pas." >&2; exit 1 ;;
+    echo "$TARGET is an index. An index is not archived." >&2; exit 1 ;;
 esac
 
-# --- 1. references entrantes --------------------------------------------------
-# On cherche le chemin complet ET le nom de base, hors archives. Le premier dit
-# qui pointe vraiment vers le fichier, le second attrape les mentions en prose.
-BASE="$(basename "$CIBLE")"
-chercher() { # <motif litteral>
+# --- 1. incoming references ---------------------------------------------------
+# We search for the full path AND the base name, outside archives. The first says who
+# really points to the file, the second catches the mentions in prose.
+BASE="$(basename "$TARGET")"
+find_refs() { # <literal pattern>
   if git rev-parse --git-dir >/dev/null 2>&1; then
     git grep -n --fixed-strings -- "$1" 2>/dev/null | grep -v "^$ARCHIVES/" || true
   else
@@ -124,133 +123,132 @@ chercher() { # <motif litteral>
       | sed 's|^\./||' | grep -v "^$ARCHIVES/" || true
   fi
 }
-REFS_CHEMIN="$(chercher "$CIBLE" | grep -v "^$CIBLE:" || true)"
-REFS_BASE="$(chercher "$BASE" | grep -v "^$CIBLE:" | grep -vF "$CIBLE" || true)"
+REFS_PATH="$(find_refs "$TARGET" | grep -v "^$TARGET:" || true)"
+REFS_BASE="$(find_refs "$BASE" | grep -v "^$TARGET:" | grep -vF "$TARGET" || true)"
 
-# Un lien markdown vers le fichier est operatif, il cassera au deplacement.
-LIENS="$(printf '%s\n' "$REFS_CHEMIN" "$REFS_BASE" | grep -v '^$' \
+# A markdown link to the file is operative, it will break on the move.
+LINKS="$(printf '%s\n' "$REFS_PATH" "$REFS_BASE" | grep -v '^$' \
          | grep -E "\]\([^)]*$BASE(#[^)]*)?\)" || true)"
-NB_LIENS="$(printf '%s\n' "$LIENS" | grep -c . || true)"
-NB_CHEMIN="$(printf '%s\n' "$REFS_CHEMIN" | grep -c . || true)"
+NB_LINKS="$(printf '%s\n' "$LINKS" | grep -c . || true)"
+NB_PATH="$(printf '%s\n' "$REFS_PATH" | grep -c . || true)"
 NB_BASE="$(printf '%s\n' "$REFS_BASE" | grep -c . || true)"
 
 echo "=============================================="
-echo " Archivage : $CIBLE"
+echo " Archiving: $TARGET"
 echo " $TODAY"
 echo "=============================================="
 echo
-echo "1. References entrantes, hors $ARCHIVES/"
-if [ "${NB_LIENS:-0}" -gt 0 ] && [ -n "$RESUME" ]; then
-  echo "  liens vivants ($NB_LIENS), ils restent valides, le resume garde le chemin :"
-  printf '%s\n' "$LIENS" | cut -c1-160 | sed 's/^/       /'
-elif [ "${NB_LIENS:-0}" -gt 0 ]; then
-  echo "  OPERATIVES, ces liens casseront ($NB_LIENS) :"
-  printf '%s\n' "$LIENS" | cut -c1-160 | sed 's/^/       /'
+echo "1. Incoming references, outside $ARCHIVES/"
+if [ "${NB_LINKS:-0}" -gt 0 ] && [ -n "$SUMMARY" ]; then
+  echo "  live links ($NB_LINKS), they stay valid, the summary keeps the path:"
+  printf '%s\n' "$LINKS" | cut -c1-160 | sed 's/^/       /'
+elif [ "${NB_LINKS:-0}" -gt 0 ]; then
+  echo "  OPERATIVE, these links will break ($NB_LINKS):"
+  printf '%s\n' "$LINKS" | cut -c1-160 | sed 's/^/       /'
 fi
-if [ "${NB_CHEMIN:-0}" -gt 0 ]; then
-  echo "  chemin cite ($NB_CHEMIN), a classer une par une :"
-  sed -n '1,20p' <<<"$REFS_CHEMIN" | cut -c1-160 | sed 's/^/       /'
-  [ "$NB_CHEMIN" -gt 20 ] && printf '       ... et %s de plus\n' "$((NB_CHEMIN - 20))"
+if [ "${NB_PATH:-0}" -gt 0 ]; then
+  echo "  path cited ($NB_PATH), to sort one by one:"
+  sed -n '1,20p' <<<"$REFS_PATH" | cut -c1-160 | sed 's/^/       /'
+  [ "$NB_PATH" -gt 20 ] && printf '       ... and %s more\n' "$((NB_PATH - 20))"
 fi
 if [ "${NB_BASE:-0}" -gt 0 ]; then
-  echo "  nom seul cite ($NB_BASE), souvent du contexte historique :"
+  echo "  name only cited ($NB_BASE), often historical context:"
   sed -n '1,10p' <<<"$REFS_BASE" | cut -c1-160 | sed 's/^/       /'
-  [ "$NB_BASE" -gt 10 ] && printf '       ... et %s de plus\n' "$((NB_BASE - 10))"
+  [ "$NB_BASE" -gt 10 ] && printf '       ... and %s more\n' "$((NB_BASE - 10))"
 fi
-[ "${NB_CHEMIN:-0}" -eq 0 ] && [ "${NB_BASE:-0}" -eq 0 ] \
-  && echo "  aucune. Personne ne cite ce fichier."
+[ "${NB_PATH:-0}" -eq 0 ] && [ "${NB_BASE:-0}" -eq 0 ] \
+  && echo "  none. Nobody cites this file."
 
-if [ "$VERIFIER" -eq 1 ]; then
+if [ "$VERIFY" -eq 1 ]; then
   echo
   echo "=============================================="
-  echo " Mode verification, rien n'a ete ecrit."
-  if [ "${NB_LIENS:-0}" -gt 0 ]; then
-    echo " $NB_LIENS lien(s) vivant(s) a retirer ou a reformuler AVANT d'archiver."
-    echo " Une fiche vivante ne cite pas une archive, la convention l'interdit."
+  echo " Verify mode, nothing was written."
+  if [ "${NB_LINKS:-0}" -gt 0 ]; then
+    echo " $NB_LINKS live link(s) to remove or reword BEFORE archiving."
+    echo " A live page does not cite an archive, the convention forbids it."
   else
-    echo " Aucun lien bloquant. L'archivage peut se faire."
+    echo " No blocking link. Archiving can go ahead."
   fi
   echo "=============================================="
   exit 0
 fi
 
-if [ -z "$RAISON" ]; then
+if [ -z "$REASON" ]; then
   echo
-  echo "--raison est obligatoire. « obsolete » ne renseigne personne." >&2
+  echo "--reason is required. \"obsolete\" tells nobody anything." >&2
   exit 2
 fi
 
-if [ "${NB_LIENS:-0}" -gt 0 ] && [ "$FORCE" -eq 0 ] && [ -z "$RESUME" ]; then
+if [ "${NB_LINKS:-0}" -gt 0 ] && [ "$FORCE" -eq 0 ] && [ -z "$SUMMARY" ]; then
   echo
-  echo "REFUS : $NB_LIENS lien(s) markdown vivant(s) pointent vers ce fichier." >&2
-  echo "Retire-les ou reformule-les d'abord, une fiche vivante ne cite pas une archive." >&2
-  echo "Puis relance. Avec --force, tu archives en laissant des liens morts derriere toi." >&2
+  echo "REFUSED: $NB_LINKS live markdown link(s) point to this file." >&2
+  echo "Remove or reword them first, a live page does not cite an archive." >&2
+  echo "Then run again. With --force, you archive and leave dead links behind." >&2
   exit 3
 fi
 
-# --- 2. deplacement -----------------------------------------------------------
+# --- 2. move -----------------------------------------------------------
 echo
-echo "2. Deplacement"
-printf '  %s\n  -> %s\n' "$CIBLE" "$DEST"
+echo "2. Move"
+printf '  %s\n  -> %s\n' "$TARGET" "$DEST"
 if [ "$DRY" -eq 0 ]; then
   mkdir -p "$(dirname "$DEST")"
   if git rev-parse --git-dir >/dev/null 2>&1 \
-     && git ls-files --error-unmatch "$CIBLE" >/dev/null 2>&1; then
-    git mv "$CIBLE" "$DEST"
+     && git ls-files --error-unmatch "$TARGET" >/dev/null 2>&1; then
+    git mv "$TARGET" "$DEST"
   else
-    echo "  (non suivi par git, deplacement simple)"
-    mv "$CIBLE" "$DEST"
+    echo "  (not tracked by git, plain move)"
+    mv "$TARGET" "$DEST"
   fi
 fi
 
-# --- 3. en-tete ---------------------------------------------------------------
+# --- 3. header ---------------------------------------------------------------
 echo
-echo "3. En-tete de provenance"
-if [ -n "$REMPLACE" ]; then
-  REMPL_TXT="$BT$REMPLACE$BT"
+echo "3. Provenance header"
+if [ -n "$REPLACED" ]; then
+  REPL_TXT="$BT$REPLACED$BT"
 else
-  REMPL_TXT="aucun remplacant, le sujet n'existe plus"
+  REPL_TXT="none, the subject no longer exists"
 fi
 if [ "$DRY" -eq 0 ]; then
   TMP="$(mktemp)"
   {
-    printf '> **ARCHIVE le %s**, document non maintenu, garde pour l historique.\n' "$TODAY"
-    printf '> **Origine** : %s%s%s\n' "$BT" "$CIBLE" "$BT"
-    printf '> **Raison** : %s\n' "$RAISON"
-    printf '> **Remplace par** : %s\n' "$REMPL_TXT"
-    printf '> **Ne pas utiliser comme source de verite.**\n'
+    printf '> ⚠️ **ARCHIVED on %s**, unmaintained, kept for history.\n' "$TODAY"
+    printf '> **Origin**: %s%s%s\n' "$BT" "$TARGET" "$BT"
+    printf '> **Reason**: %s\n' "$REASON"
+    printf '> **Replaced by**: %s\n' "$REPL_TXT"
+    printf '> **Not a source of truth.**\n'
     printf '\n'
     cat "$DEST"
   } > "$TMP"
   mv "$TMP" "$DEST"
 fi
-printf '  date %s, origine, raison, remplacant : %s\n' "$TODAY" "$REMPL_TXT"
+printf '  date %s, origin, reason, replacement: %s\n' "$TODAY" "$REPL_TXT"
 
-# --- 4. liens du fichier deplace ----------------------------------------------
-# Le fichier a change de profondeur, ses liens relatifs vers ce qui reste vivant
-# ne resolvent plus. On ne peut pas se contenter de prefixer des ../ : le chemin
-# d'origine est reinjecte SOUS le prefixe d'archive, donc remonter ne suffit pas,
-# il faut redescendre. On resout donc chaque lien depuis la racine du depot, puis
-# on repart de la nouvelle profondeur. Les liens externes, les ancres et les
-# chemins absolus ne bougent pas, et on ne touche pas aux blocs de code.
-OLDDIR="$(dirname "$CIBLE")"
+# --- 4. links of the moved file -----------------------------------------------
+# The file changed depth, its relative links to what stays alive no longer resolve.
+# Prefixing ../ is not enough: the original path is reinjected UNDER the archive
+# prefix, so going up is not enough, one has to come back down. Each link is resolved
+# from the repository root, then rebuilt from the new depth. External links, anchors
+# and absolute paths do not move, and code blocks are left alone.
+OLDDIR="$(dirname "$TARGET")"
 [ "$OLDDIR" = "." ] && OLDDIR=""
 NEWDIR="$(dirname "$DEST")"
-PROFONDEUR="$(printf '%s' "$NEWDIR" | tr '/' '\n' | grep -c .)"
+DEPTH="$(printf '%s' "$NEWDIR" | tr '/' '\n' | grep -c .)"
 UP=""
 i=0
-while [ "$i" -lt "$PROFONDEUR" ]; do UP="../$UP"; i=$((i + 1)); done
+while [ "$i" -lt "$DEPTH" ]; do UP="../$UP"; i=$((i + 1)); done
 echo
-echo "4. Liens relatifs du fichier deplace"
-AVANT="$(grep -oE '\]\([^)]*\)' "$DEST" 2>/dev/null \
+echo "4. Relative links of the moved file"
+BEFORE="$(grep -oE '\]\([^)]*\)' "$DEST" 2>/dev/null \
          | grep -vcE '\]\((https?:|mailto:|#|/)' || true)"
-if [ "${AVANT:-0}" -gt 0 ]; then
-  printf '  %s lien(s) relatif(s) resolu(s) depuis la racine, prefixe %s\n' "$AVANT" "$UP"
+if [ "${BEFORE:-0}" -gt 0 ]; then
+  printf '  %s relative link(s) resolved from the root, prefix %s\n' "$BEFORE" "$UP"
   if [ "$DRY" -eq 0 ]; then
     TMP="$(mktemp)"
     awk -v UP="$UP" -v OLDDIR="$OLDDIR" -v FENCE="$FENCE" '
-      # Normalise un chemin : retire . et resout .. sans toucher au disque.
-      function normalise(p,   n, seg, m, i, out, r) {
+      # Normalizes a path: removes . and resolves .. without touching the disk.
+      function normalize(p,   n, seg, m, i, out, r) {
         n = split(p, seg, "/")
         m = 0
         for (i = 1; i <= n; i++) {
@@ -262,7 +260,7 @@ if [ "${AVANT:-0}" -gt 0 ]; then
         for (i = 1; i <= m; i++) r = (r == "" ? out[i] : r "/" out[i])
         return r
       }
-      function rebase(u,   anchor, h, cible) {
+      function rebase(u,   anchor, h, target) {
         if (u ~ /^(https?:|mailto:|#|\/)/) return u
         if (u ~ /^\{\{/) return u
         if (u ~ /^</) return u
@@ -270,98 +268,98 @@ if [ "${AVANT:-0}" -gt 0 ]; then
         h = index(u, "#")
         if (h > 0) { anchor = substr(u, h); u = substr(u, 1, h - 1) }
         if (u == "") return anchor
-        cible = normalise((OLDDIR == "" ? u : OLDDIR "/" u))
-        return UP cible anchor
+        target = normalize((OLDDIR == "" ? u : OLDDIR "/" u))
+        return UP target anchor
       }
-      index($0, FENCE) == 1 { dans = !dans; print; next }
-      dans { print; next }
+      index($0, FENCE) == 1 { inside = !inside; print; next }
+      inside { print; next }
       {
         out = ""; rest = $0
         while (match(rest, /\]\([^)]*\)/)) {
-          pre = substr(rest, 1, RSTART - 1)
+          before = substr(rest, 1, RSTART - 1)
           tok = substr(rest, RSTART, RLENGTH)
           rest = substr(rest, RSTART + RLENGTH)
           url = substr(tok, 3, length(tok) - 3)
-          out = out pre "](" rebase(url) ")"
+          out = out before "](" rebase(url) ")"
         }
         print out rest
       }' "$DEST" > "$TMP"
     mv "$TMP" "$DEST"
   fi
 else
-  echo "  aucun lien relatif a resoudre"
+  echo "  no relative link to resolve"
 fi
 
-# --- 5. ligne d'index ---------------------------------------------------------
+# --- 5. index line ---------------------------------------------------------
 echo
 echo "5. Index"
-LIGNE="| $TODAY | $BT$CIBLE$BT | $BT$DEST$BT | $RAISON | $REMPL_TXT |"
+LINE="| $TODAY | $BT$TARGET$BT | $BT$DEST$BT | $REASON | $REPL_TXT |"
 if [ -f "$ARCHIVES/README.md" ] && grep -q '^|---' "$ARCHIVES/README.md"; then
   if [ "$DRY" -eq 0 ]; then
     TMP="$(mktemp)"
-    awk -v l="$LIGNE" 'BEGIN{fait=0} { print } /^\|---/ && !fait { print l; fait=1 }' \
+    awk -v l="$LINE" 'BEGIN{done=0} { print } /^\|---/ && !done { print l; done=1 }' \
       "$ARCHIVES/README.md" > "$TMP"
     mv "$TMP" "$ARCHIVES/README.md"
   fi
-  echo "  ligne ajoutee dans $ARCHIVES/README.md"
+  echo "  line added to $ARCHIVES/README.md"
 else
-  echo "  $ARCHIVES/README.md absent ou sans table. Ligne a poser a la main :"
-  echo "    $LIGNE"
+  echo "  $ARCHIVES/README.md missing or without a table. Line to add by hand:"
+  echo "    $LINE"
 fi
 
-# --- 5 bis. resume en place ---------------------------------------------------
-if [ -n "$RESUME" ]; then
+# --- 5 bis. summary in place ---------------------------------------------------
+if [ -n "$SUMMARY" ]; then
   echo
-  echo "5 bis. Resume a l'ancien chemin"
-  printf '  %s reste en place, texte integral dans %s\n' "$CIBLE" "$DEST"
+  echo "5 bis. Summary at the old path"
+  printf '  %s stays in place, full text in %s\n' "$TARGET" "$DEST"
   if [ "$DRY" -eq 0 ]; then
-    sed "s|{{ARCHIVE}}|$DEST|g" "$RESUME" > "$CIBLE"
+    sed "s|{{ARCHIVE}}|$DEST|g" "$SUMMARY" > "$TARGET"
   fi
 fi
 
 # --- 6. verification ----------------------------------------------------------
-# La porte. C'est elle qui distingue un archivage fini d'un archivage a moitie
-# fait, et c'est celle qui manquait quand le geste se faisait a la main.
+# The gate. It tells a finished archiving from a half-done one, and it is the one that
+# was missing when the gesture was done by hand.
 echo
-echo "6. Verification"
+echo "6. Check"
 if [ "$DRY" -eq 1 ]; then
-  echo "  sautee, mode simulation"
+  echo "  skipped, dry run"
   echo
-  echo "Simulation terminee, rien n'a ete ecrit."
+  echo "Dry run finished, nothing was written."
   exit 0
 fi
-if [ -n "$RESUME" ]; then
-  if [ -s "$CIBLE" ] && [ -s "$DEST" ]; then
-    echo "  [ok] resume en place a $CIBLE, texte integral dans $DEST"
+if [ -n "$SUMMARY" ]; then
+  if [ -s "$TARGET" ] && [ -s "$DEST" ]; then
+    echo "  [ok] summary in place at $TARGET, full text in $DEST"
     echo
     echo "=============================================="
-    echo " Archive, resume gardé. Rien n'est commite, verifie avec git status."
+    echo " Archived, summary kept. Nothing is committed, check with git status."
     echo "=============================================="
     exit 0
   fi
-  echo "  [!] le resume ou l'archive manque apres l'operation" >&2
+  echo "  [!] the summary or the archive is missing after the operation" >&2
   exit 1
 fi
-RESTE="$(chercher "$CIBLE" | grep -v "^$DEST:" || true)"
-NB_RESTE="$(printf '%s\n' "$RESTE" | grep -c . || true)"
-if [ "${NB_RESTE:-0}" -gt 0 ]; then
-  echo "  [!] $NB_RESTE occurrence(s) de l'ancien chemin hors des archives :"
-  sed -n '1,15p' <<<"$RESTE" | cut -c1-160 | sed 's/^/       /'
+LEFT="$(find_refs "$TARGET" | grep -v "^$DEST:" || true)"
+NB_LEFT="$(printf '%s\n' "$LEFT" | grep -c . || true)"
+if [ "${NB_LEFT:-0}" -gt 0 ]; then
+  echo "  [!] $NB_LEFT occurrence(s) of the old path outside the archives:"
+  sed -n '1,15p' <<<"$LEFT" | cut -c1-160 | sed 's/^/       /'
   echo
   echo "=============================================="
-  echo " Archivage INCOMPLET. Le fichier est deplace, son en-tete et sa ligne"
-  echo " d'index sont poses, mais des references pointent encore vers l'ancien"
-  echo " chemin. Corrige celles listees ci-dessus."
+  echo " Archiving INCOMPLETE. The file is moved, its header and its index line"
+  echo " are in place, but references still point to the old path."
+  echo " Fix the ones listed above."
   echo "=============================================="
   exit 1
 fi
-echo "  [ok] aucune occurrence de l'ancien chemin hors des archives"
+echo "  [ok] no occurrence of the old path outside the archives"
 echo
 echo "=============================================="
 if git rev-parse --git-dir >/dev/null 2>&1; then
-  echo " Archive. Rien n'est commite, verifie avec git status."
+  echo " Archived. Nothing is committed, check with git status."
 else
-  echo " Archive. Le depot n'est pas suivi par git, l'historique du fichier n'est pas garde."
+  echo " Archived. The repository is not tracked by git, the file history is not kept."
 fi
-echo " Pour retrouver ce contenu plus tard : ctx-archeo.sh <motif>"
+echo " To find this content later: ctx-archaeology.sh <pattern>"
 echo "=============================================="

@@ -1,50 +1,50 @@
-> **Statut** : ✅ à jour, vérifié le {{DATE}}
-> **Type** : feature
-> **Portée** : `<chemins impliqués>`
-> **Voir aussi** : `docs/modules/<...>.md`
+> **Status**: ✅ up to date, checked on {{DATE}}
+> **Type**: feature
+> **Scope**: `<paths involved>`
+> **See also**: `docs/modules/<...>.md`
 
-# Feature, <nom>
+# Feature, <name>
 
-**Ce que ça fait, et pour qui** : <une ou deux phrases, du point de vue de l'utilisateur, pas
-du code.>
+**What it does, and for whom**: <one or two sentences, from the user's point of view, not the
+code's.>
 
-**État** : <en production, ou derrière un flag `<nom>`, ou partiel avec <ce qui manque>>
+**State**: <in production, or behind a flag `<name>`, or partial with <what is missing>>
 
-## Parcours
+## Journey
 
-<Le chemin de bout en bout, avec les fichiers traversés. C'est la section qui fait gagner le
-plus de temps à un lecteur à froid.>
+<The end-to-end path, with the files crossed. This is the section that saves a cold reader the
+most time.>
 
-1. <déclencheur : action utilisateur, appel, événement> → `<fichier>`
-2. <traitement> → `<fichier>`
-3. <résultat observable> → `<fichier>`
+1. <trigger: user action, call, event> → `<file>`
+2. <processing> → `<file>`
+3. <observable result> → `<file>`
 
-## Fichiers impliqués
+## Files involved
 
-| Fichier | Rôle dans la feature |
+| File | Role in the feature |
 |---|---|
-| `<chemin>` | <une ligne> |
+| `<path>` | <one line> |
 
 ## Configuration
 
-| Réglage | Où | Valeur par défaut | Effet |
+| Setting | Where | Default | Effect |
 |---|---|---|---|
-| `<nom>` | `<var d'env ou fichier>` | `<valeur>` | <ce que ça change> |
+| `<name>` | `<env var or file>` | `<value>` | <what it changes> |
 
-## Cas limites et erreurs
+## Edge cases and errors
 
-| Situation | Comportement attendu |
+| Situation | Expected behavior |
 |---|---|
-| <entrée invalide, service indisponible, concurrence, quota> | <ce qui se passe> |
+| <invalid input, service down, concurrency, quota> | <what happens> |
 
-## Limites connues
+## Known limits
 
-- <ce que la feature ne fait pas, ou pas encore, et pourquoi>
+- <what the feature does not do, or not yet, and why>
 
-## Comment vérifier que ça marche
+## How to check it works
 
 ```bash
-<commande, requête ou scénario manuel rejouable>
+<replayable command, request or manual scenario>
 ```
 
-Résultat attendu : <ce qu'on doit observer>
+Expected result: <what you should observe>

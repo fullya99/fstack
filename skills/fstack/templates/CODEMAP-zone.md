@@ -1,54 +1,54 @@
-<!-- Carte de zone. Se lit à la demande, quand on travaille dans {{ZONE}}.
-     Pas de TODOS ni de CHANGELOG ici : l'état et le journal restent uniques, à la racine.
-     Cible 150 lignes, au-delà de 250 la zone se scinde. -->
+<!-- Zone map. Read on demand, when working in {{ZONE}}.
+     No TODOS or CHANGELOG here: state and log stay unique, at the root.
+     Aim for 150 lines, beyond 250 the zone splits. -->
 
-# Carte de zone, {{ZONE}}
+# Zone map, {{ZONE}}
 
-> Ce que cette zone fait, et ce qui casse quand on y touche. Fait partie de {{PROJECT_NAME}},
-> dont la carte générale est `CODEMAP.md` à la racine.
-> Dernière mise à jour : {{DATE}}
+> What this zone does, and what breaks when you touch it. Part of {{PROJECT_NAME}},
+> whose general map is `CODEMAP.md` at the root.
+> Last updated: {{DATE}}
 
-**En une phrase** : <ce que fait cette zone, et qui la consomme>.
+**In one sentence**: <what this zone does, and who consumes it>.
 
 ---
 
-## Arborescence
+## Tree
 
 ```
 {{ZONE}}/
-├── <dir ou fichier>    # rôle en une ligne
-└── <dir ou fichier>    # rôle en une ligne
+├── <dir or file>    # role in one line
+└── <dir or file>    # role in one line
 ```
 
 ---
 
-## Points d'entrée
+## Entry points
 
-| Entrée | Fichier | Appelé par |
+| Entry | File | Called by |
 |---|---|---|
-| <nom> | `<chemin>:<ligne>` | <route, commande, événement, autre zone> |
+| <name> | `<path>:<line>` | <route, command, event, other zone> |
 
 ---
 
-## Flux
+## Flow
 
-<Le chemin nominal à travers la zone, en trois à six étapes, avec les fichiers traversés.>
-
----
-
-## Pièges
-
-<!-- Un symptôme suivi de sa cause, pas une consigne. C'est ici que vivent les zones sensibles
-     de cette zone, pas dans le CODEMAP de la racine. -->
-
-- `<chemin>` : <ce qui surprend, et pourquoi>
+<The nominal path through the zone, in three to six steps, with the files crossed.>
 
 ---
 
-## Commandes propres à la zone
+## Pitfalls
 
-<!-- Seulement si elles diffèrent de celles de la racine. Sinon, supprime la section. -->
+<!-- A symptom followed by its cause, not an instruction. The sensitive areas of this zone
+     live here, not in the root CODEMAP. -->
 
-| But | Commande |
+- `<path>`: <what surprises, and why>
+
+---
+
+## Zone commands
+
+<!-- Only if they differ from the root ones. Otherwise delete the section. -->
+
+| Goal | Command |
 |---|---|
-| Tester cette zone seule | `<cmd>` |
+| Test this zone alone | `<cmd>` |

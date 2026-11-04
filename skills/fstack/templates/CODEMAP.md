@@ -1,107 +1,106 @@
 <!-- contexte:convention
 version: 5
-profil: {{PROFIL}}
+profil: {{PROFILE}}
 piliers: CODEMAP.md, TODOS.md, CHANGELOG.md
 docs: {{DOCS}}
 archives: {{ARCHIVES}}
-langue: fr
+langue: {{LANGUAGE}}
 -->
 
 # CODEMAP, {{PROJECT_NAME}}
 
-> Où ça se trouve, et qu'est-ce qui touche quoi.
-> Dernière mise à jour : {{DATE}}
+> Where things are, and what touches what.
+> Last updated: {{DATE}}
 
-<!-- Cible 250 lignes, blocage à 400. Ce qui déborde descend dans une carte de zone. -->
+<!-- Aim for 250 lines, blocker at 400. What overflows goes down into a zone map. -->
 
-**En une phrase** : <ce que fait ce projet, et pour qui>.
+**In one sentence**: <what this project does, and for whom>.
 
 ---
 
-## Arborescence
+## Tree
 
 ```
-<racine>/
-├── <dir>/          # rôle en une ligne
-├── <dir>/          # rôle en une ligne
-└── <dir>/          # rôle en une ligne
+<root>/
+├── <dir>/          # role in one line
+├── <dir>/          # role in one line
+└── <dir>/          # role in one line
 ```
 
-<!-- Ne liste que ce qui porte du sens. Omets les dépendances, les builds, les caches. -->
+<!-- List only what carries meaning. Leave out dependencies, builds, caches. -->
 
 ---
 
 ## Modules
 
-| Module | Chemin | Rôle | Fiche |
+| Module | Path | Role | Page |
 |---|---|---|---|
-| <nom> | `<chemin>` | <une ligne> | [docs](docs/modules/<nom>.md) |
+| <name> | `<path>` | <one line> | [docs](docs/modules/<name>.md) |
 
 ---
 
-## Points d'entrée
+## Entry points
 
-| Entrée | Fichier | Déclenché par |
+| Entry | File | Triggered by |
 |---|---|---|
-| <nom> | `<chemin>:<ligne>` | <commande, route, événement, cron> |
+| <name> | `<path>:<line>` | <command, route, event, cron> |
 
 ---
 
-## Flux principal
+## Main flow
 
-<Le chemin nominal, en trois à six étapes, avec les fichiers traversés.>
+<The nominal path, in three to six steps, with the files crossed.>
 
-1. `<fichier>` : <ce qui s'y passe>
-2. `<fichier>` : <ce qui s'y passe>
-3. `<fichier>` : <ce qui s'y passe>
+1. `<file>`: <what happens there>
+2. `<file>`: <what happens there>
+3. `<file>`: <what happens there>
 
 ---
 
-## Dépendances externes
+## External dependencies
 
-| Dépendance | Usage | Configuration | Où sont les identifiants |
+| Dependency | Use | Configuration | Where the credentials are |
 |---|---|---|---|
-| <service, API, base> | <à quoi ça sert> | `<var d'env ou fichier>` | <emplacement, **jamais la valeur**> |
+| <service, API, database> | <what it is for> | `<env var or file>` | <location, **never the value**> |
 
 ---
 
-## Commandes
+## Commands
 
-| But | Commande |
+| Goal | Command |
 |---|---|
-| Installer | `<cmd>` |
-| Lancer | `<cmd>` |
-| Tester | `<cmd>` |
-| Lint et format | `<cmd>` |
+| Install | `<cmd>` |
+| Run | `<cmd>` |
+| Test | `<cmd>` |
+| Lint and format | `<cmd>` |
 | Build | `<cmd>` |
-| Déployer | `<cmd>` |
+| Deploy | `<cmd>` |
 
 ---
 
-## Zones sensibles
+## Sensitive areas
 
-<!-- Seulement ce qui n'appartient à aucune zone ni à aucune fiche. Un piège qui concerne une
-     zone va dans sa carte. -->
+<!-- Only what belongs to no zone and no page. A pitfall that concerns a zone goes in its map. -->
 
-- `<chemin>` : <généré, ne pas éditer à la main, ou effet de bord, ou convention non évidente>
+- `<path>`: <generated, do not edit by hand, or side effect, or non-obvious convention>
 
 ---
 
 ## Zones
 
-<!-- Un répertoire qui porte sa propre carte. Liste et POINTE, ne recopie rien. Vide sur un
-     petit projet, c'est normal. -->
+<!-- A directory that carries its own map. List and POINT, copy nothing. Empty on a small
+     project, that is normal. -->
 
-| Zone | Chemin | Sa carte | Ses règles |
+| Zone | Path | Its map | Its rules |
 |---|---|---|---|
-| <nom> | `<chemin>` | [CODEMAP](<chemin>/CODEMAP.md) | `<chemin>/CLAUDE.md` ou « aucune » |
+| <name> | `<path>` | [CODEMAP](<path>/CODEMAP.md) | `<path>/CLAUDE.md` or "none" |
 
 ---
 
-## Sous-projets
+## Subprojects
 
-<!-- Monorepo uniquement. Un sous-projet porte ses trois piliers et se clôture à part. -->
+<!-- Monorepo only. A subproject carries its three pillars and is debriefed separately. -->
 
-| Sous-projet | Chemin | Sa carte |
+| Subproject | Path | Its map |
 |---|---|---|
-| <nom> | `<chemin>` | [CODEMAP](<chemin>/CODEMAP.md) |
+| <name> | `<path>` | [CODEMAP](<path>/CODEMAP.md) |

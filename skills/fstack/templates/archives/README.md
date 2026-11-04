@@ -1,54 +1,53 @@
 # Archives, {{PROJECT_NAME}}
 
-> ⚠️ **Rien ici n'est une source de vérité.** Ce répertoire garde deux choses, ce qui a été vrai
-> et ne l'est plus, et ce qui est encore vrai mais froid, les entrées anciennes des journaux mises
-> de côté par rotation. L'en-tête de chaque fichier dit lequel des deux il est. On ne lit rien ici
-> en reprise de session, on ne le cite pas depuis une fiche vivante. Uniquement sur demande
-> explicite d'archéologie.
+> ⚠️ **Nothing here is a source of truth.** This directory keeps two things, what was true
+> and no longer is, and what is still true but cold, the old log entries set aside by rotation.
+> The header of each file says which of the two it is. Nothing here is read on session resume,
+> nothing is cited from a living page. Only on explicit archaeology request.
 >
-> La documentation à jour est dans `docs/` et dans les 3 piliers à la racine.
+> Up-to-date documentation is in `docs/` and in the 3 pillars at the root.
 
-## Règles
+## Rules
 
-**Aucune suppression silencieuse.** Un document retiré est déplacé ici, jamais effacé.
+**No silent deletion.** A removed document is moved here, never erased.
 
-**Emplacement** : `archives/<AAAA-MM>/<chemin d'origine complet>`. Le bucket daté évite les
-collisions dans le temps, le chemin préservé rend la provenance lisible.
+**Location**: `archives/<YYYY-MM>/<full original path>`. The dated bucket avoids collisions over
+time, the preserved path makes provenance readable.
 
-**Déplacement avec `git mv`**, pour garder l'historique du fichier.
+**Move with `git mv`**, to keep the file history.
 
-**En-tête obligatoire** en tête du fichier archivé :
+**Mandatory header** at the top of the archived file:
 
 ```markdown
-> ⚠️ **ARCHIVÉ le AAAA-MM-JJ**, document non maintenu, gardé pour l'historique.
-> **Origine** : `<chemin d'origine>`
-> **Raison** : <explicite et vérifiable, pas seulement « obsolète »>
-> **Remplacé par** : `<chemin>` (ou « aucun remplaçant »)
-> **Ne pas utiliser comme source de vérité.**
+> ⚠️ **ARCHIVED on YYYY-MM-DD**, unmaintained, kept for history.
+> **Origin**: `<original path>`
+> **Reason**: <explicit and verifiable, not just "obsolete">
+> **Replaced by**: `<path>` (or "none, the subject no longer exists")
+> **Not a source of truth.**
 ```
 
-Les chemins sont notés depuis la racine du dépôt, jamais en lien relatif. Un fichier déplacé
-casse ses liens relatifs.
+Paths are written from the repository root, never as a relative link. A moved file breaks its
+relative links.
 
-**Ne vont pas ici** : le code mort (git le garde), les builds et caches, les secrets même
-expirés, les brouillons jamais publiés, les règles durables devenues fausses (supprimées), les ADR supersédés
-(ils restent en place, marqués).
+**Do not go here**: dead code (git keeps it), builds and caches, secrets even expired, drafts
+never published, durable rules that became false (deleted), superseded ADRs (they stay in
+place, marked).
 
-## Y chercher quelque chose
+## Searching it
 
 ```bash
-bash "$SKILL/scripts/ctx-archeo.sh" <motif>          # provenance et extraits, sortie bornée
-bash "$SKILL/scripts/ctx-archeo.sh" --liste          # inventaire, une entrée par fichier
+bash "$SKILL/scripts/ctx-archaeology.sh" <pattern>          # provenance and excerpts, bounded output
+bash "$SKILL/scripts/ctx-archaeology.sh" --list          # inventory, one entry per file
 ```
 
-Pas un `grep` nu : il rend une ligne sans son en-tête, donc on prend une entrée froide pour une
-vérité courante.
+Not a bare `grep`: it returns a line without its header, so a cold entry gets taken for a
+current truth.
 
 ## Index
 
-| Archivé le | Origine | Emplacement | Raison | Remplacé par |
+| Archived on | Origin | Location | Reason | Replaced by |
 |---|---|---|---|---|
 | | | | | |
 
-<!-- Plus récent en haut. Une ligne ajoutée dans le même mouvement que le déplacement.
-     Un fichier présent dans archives/ mais absent de cet index est un défaut. -->
+<!-- Most recent on top. A line added in the same move as the move itself.
+     A file present in archives/ but absent from this index is a defect. -->

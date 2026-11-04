@@ -1,22 +1,22 @@
 # CHANGELOG, {{PROJECT_NAME}}
 
-> Ce qui a changé, pourquoi et comment revenir en arrière.
-> Plus récent en haut. Une entrée par session utile, pas une par commit. Append-only : on ne
-> réécrit pas le passé, on le corrige par une nouvelle entrée.
+> What changed, why, and how to go back.
+> Most recent on top. One entry per useful session, not one per commit. Append-only: the past
+> is not rewritten, it is corrected by a new entry.
 
-<!-- Une entrée tient en 25 lignes, le détail va dans une fiche docs/ et l'entrée pointe.
-     Au-delà de 30 entrées, le journal tourne : les anciennes partent dans
-     archives/changelog/AAAA-MM.md par ctx-rotation.sh, qui pose ici la ligne qui le dit. -->
+<!-- An entry fits in 25 lines, the detail goes in a docs/ page and the entry points to it.
+     Beyond 30 entries, the log rotates: the old ones go to
+     archives/changelog/YYYY-MM.md through ctx-rotation.sh, which leaves here the line saying so. -->
 
 ---
 
-## {{DATE}}, mise en place de la convention de contexte
+## {{DATE}}, context convention set up
 
-**Quoi** : ajout de `CODEMAP.md`, `TODOS.md`, `CHANGELOG.md`, `docs/`, `archives/`.
+**What**: added `CODEMAP.md`, `TODOS.md`, `CHANGELOG.md`, `docs/`, `archives/`.
 
-**Pourquoi** : pouvoir repartir d'un contexte vide sans perdre d'information. Le dépôt devient la
-source de vérité.
+**Why**: to restart from an empty context without losing information. The repository becomes the
+source of truth.
 
-**Rollback** : supprimer les fichiers ajoutés. Aucun impact sur le code.
+**Rollback**: delete the added files. No impact on the code.
 
-**Voir aussi** : `docs/README.md`, `archives/README.md`.
+**See also**: `docs/README.md`, `archives/README.md`.

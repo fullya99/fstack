@@ -1,110 +1,109 @@
 #!/usr/bin/env bash
 #
-# ctx-audit.sh : rapport de derive entre la documentation et la realite, et
-# mesure du budget de contexte.
+# ctx-audit.sh: drift report between the documentation and reality, and
+# context budget measurement.
 #
-# Le script signale, il ne corrige rien et il ne juge pas. A toi de trancher.
-# Usage :
-#   bash ctx-audit.sh [--root <chemin>] [--peremption <jours>] [--strict] [--budget] [--json]
+# The script reports, it fixes nothing and it does not judge. You decide.
+# Usage:
+#   bash ctx-audit.sh [--root <path>] [--staleness <days>] [--strict] [--budget] [--json]
 #
-# --budget : ne lance que la section 10, la mesure du budget : tailles, cout de
-#            reprise, cliquet ajourne. Rapide, pour la cloture et le hook de demarrage.
-# --strict : sortie en code 1 s'il reste au moins une alerte (utile en CI).
-# --json   : une liste JSON sur la sortie standard, un objet par alerte
-#            {"section","niveau","fichier","message"}, et rien d'autre.
+# --budget: runs only section 10, the budget measurement: sizes, resume cost,
+#           ratchet. Fast, for the debrief and the startup hook.
+# --strict: exits with code 1 if at least one warning is left (useful in CI).
+# --json  : a JSON list on standard output, one object per warning
+#           {"section","level","file","nature","message"}, and nothing else.
 #
-# set -f : sans ca, une portee du genre `src/auth/**` serait developpee par le shell
-# au moment de la lire, et on comparerait des fichiers au lieu du motif.
+# set -f: without it, a scope like `src/auth/**` would be expanded by the shell
+# when read, and files would be compared instead of the pattern.
 set -euf
 
-# Bibliotheque commune, chargee avant le cd vers la racine auditee.
-DIR_SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
-. "$DIR_SCRIPTS/ctx-commun.sh"
+# Shared library, loaded before the cd to the audited root.
+SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPTS_DIR/ctx-common.sh"
 
 ROOT=""
-PEREMPTION=120
+STALENESS=120
 STRICT=0
-BUDGET_SEUL=0
+BUDGET_ONLY=0
 JSON=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --root)       ROOT="${2:-}"; shift 2 ;;
-    --peremption) PEREMPTION="${2:-120}"; shift 2 ;;
+    --staleness)  STALENESS="${2:-120}"; shift 2 ;;
     --strict)     STRICT=1; shift ;;
-    --budget)     BUDGET_SEUL=1; shift ;;
+    --budget)     BUDGET_ONLY=1; shift ;;
     --json)       JSON=1; shift ;;
     -h|--help)    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) echo "Option inconnue : $1" >&2; exit 2 ;;
+    *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
 
-APPEL="$(pwd)"
-RACINE_DEDUITE=0
+CALL_DIR="$(pwd)"
+ROOT_INFERRED=0
 if [ -z "$ROOT" ]; then
   ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-  RACINE_DEDUITE=1
+  ROOT_INFERRED=1
 fi
 ROOT="$(cd "$ROOT" && pwd)"
 cd "$ROOT"
 
-# Le bloc se lit une fois ici. Les conv_lire qui suivent, y compris dans un $(...), viennent
-# de la memoire : sans ca chaque appel relance un find, un grep et un awk.
-conv_charger
+# The block is read once here. The conv_read calls that follow, including inside $(...), come
+# from memory: otherwise each call starts a find, a grep and an awk.
+conv_load
 
-# Un bloc plus recent que ces scripts : on refuse de tourner plutot que de mal lire.
-version_scripts || exit 1
+# A block newer than these scripts: refuse to run rather than misread it.
+scripts_version || exit 1
 
-# En mode --json, la sortie standard ne porte que la liste finale : tout le texte
-# lisible part vers /dev/null, la liste sort par le descripteur 3.
+# In --json mode, standard output carries only the final list: all readable text
+# goes to /dev/null, the list leaves through descriptor 3.
 if [ "$JSON" -eq 1 ]; then
   exec 3>&1 1>/dev/null
 fi
 
-# En texte, le rapport s'ecrit dans un fichier temporaire et ne sort qu'a la fin, par
-# agreger_sortie : il faut le total de chaque nature d'alerte avant d'imprimer la premiere.
-# La sortie se vide a la sortie du script, y compris sur une erreur ou un signal, pour qu'un
-# arret en cours de route montre ce qui a deja ete dit. Sans fichier temporaire, le rapport
-# s'imprime tel quel, sans agregation.
-AGREG_TMP=""
-ROT_SORTIE=""
+# In text mode, the report is written to a temporary file and only comes out at the end,
+# through aggregate_output: the total of each warning nature is needed before printing the
+# first one. The output is flushed on exit, including on an error or a signal, so that a
+# run stopped halfway shows what was already said. Without a temporary file, the report is
+# printed as is, without aggregation.
+AGG_TMP=""
+ROT_OUT=""
 ROT_PID=""
-sortie_finale() {
+final_output() {
   [ -z "$ROT_PID" ] || kill "$ROT_PID" 2>/dev/null || true
-  [ -z "$ROT_SORTIE" ] || rm -f "$ROT_SORTIE"
-  if [ -n "$AGREG_TMP" ]; then
+  [ -z "$ROT_OUT" ] || rm -f "$ROT_OUT"
+  if [ -n "$AGG_TMP" ]; then
     exec 1>&5 5>&-
-    agreger_sortie < "$AGREG_TMP" || true
-    rm -f "$AGREG_TMP"
+    aggregate_output < "$AGG_TMP" || true
+    rm -f "$AGG_TMP"
   fi
   return 0
 }
-trap sortie_finale EXIT
+trap final_output EXIT
 if [ "$JSON" -eq 0 ]; then
-  AGREG_TMP="$(mktemp "${TMPDIR:-/tmp}/ctx-audit.XXXXXX" 2>/dev/null)" || AGREG_TMP=""
-  if [ -n "$AGREG_TMP" ]; then exec 5>&1 1>"$AGREG_TMP"; fi
+  AGG_TMP="$(mktemp "${TMPDIR:-/tmp}/ctx-audit.XXXXXX" 2>/dev/null)" || AGG_TMP=""
+  if [ -n "$AGG_TMP" ]; then exec 5>&1 1>"$AGG_TMP"; fi
 fi
 
-TODAY="$(ctx_aujourdhui)"
-ALERTES=0
-BLOCAGES=0
+TODAY="$(ctx_today)"
+WARNINGS=0
+BLOCKERS=0
 SEC=""
-JSON_BRUT=""
+JSON_RAW=""
 TAB="$(printf '\t')"
 
-# Les alertes s'accumulent en brut (section, niveau, fichier, message separes par le
-# separateur d'unite, une alerte par separateur d'enregistrement) et s'echappent d'un coup
-# a la fin, dans un seul awk. Un sous-processus par champ et par alerte coutait six
-# millisecondes l'alerte, deux secondes pour trois cents. LC_ALL=C : un nom de fichier en
-# Latin-1 est une suite d'octets invalide en UTF-8, et le sed BSD de macOS refuse la ligne.
-# En C, un octet reste un octet. Les caracteres de controle sont supprimes, la tabulation
-# devient \t, le saut de ligne une espace.
+# Warnings accumulate raw (section, level, file, message separated by the unit
+# separator, one warning per record separator) and are escaped all at once at the end, in
+# a single awk. One subprocess per field and per warning cost six milliseconds a warning,
+# two seconds for three hundred. LC_ALL=C: a Latin-1 file name is an invalid UTF-8 byte
+# sequence, and the BSD sed on macOS rejects the line. In C, a byte stays a byte. Control
+# characters are removed, the tab becomes \t, the newline a space.
 US="$(printf '\037')"
 RS_="$(printf '\036')"
-# La nature d'une alerte : son message sans les chemins ni les nombres. Deux alertes de meme
-# nature disent la meme chose de fichiers differents (« pas d'en-tete de statut »). Un mot est
-# un chemin s'il porte un / ou s'il se termine par une extension de fichier courante. Source
-# awk, partagee par la sortie JSON et par l'agregation du texte.
+# The nature of a warning: its message without paths or numbers. Two warnings of the same
+# nature say the same thing about different files ("no status header"). A word is a path
+# if it carries a / or ends with a common file extension. awk source, shared by the JSON
+# output and by the text aggregation.
 NATURE_AWK='
 function nature(m,   n, i, t, r, a) {
   n = split(m, a, " ")
@@ -121,7 +120,7 @@ function nature(m,   n, i, t, r, a) {
 }
 '
 
-json_sortie() { # <alertes brutes> : la liste JSON sur la sortie standard
+json_output() { # <raw warnings>: the JSON list on standard output
   printf '%s' "$1" | LC_ALL=C awk "$NATURE_AWK"'BEGIN { RS = "\036"; FS = "\037"; n = 0 }
     function rep(s, de, par,   o, i) {
       o = ""
@@ -139,20 +138,20 @@ json_sortie() { # <alertes brutes> : la liste JSON sur la sortie standard
       m = $4
       for (k = 5; k <= NF; k++) m = m $k
       if (n++) printf ",\n"
-      # nature avant message : ctx-demarrage.sh lit le message en coupant tout ce qui suit
-      # `"message":"` jusqu a la fin de la ligne.
-      printf "{\"section\":\"%s\",\"niveau\":\"%s\",\"fichier\":\"%s\",\"nature\":\"%s\",\"message\":\"%s\"}", esc($1), esc($2), esc($3), esc(nature(m)), esc(m)
+      # nature before message: ctx-startup.sh reads the message by cutting everything after
+      # `"message":"` up to the end of the line.
+      printf "{\"section\":\"%s\",\"level\":\"%s\",\"file\":\"%s\",\"nature\":\"%s\",\"message\":\"%s\"}", esc($1), esc($2), esc($3), esc(nature(m)), esc(m)
     }
     END { if (n) printf "\n" }'
   return 0
 }
 
-# Agregation des alertes repetitives, sur le texte lisible seulement. Au-dela de 5 alertes de
-# meme nature dans une section, les 3 premieres s'impriment telles quelles et une ligne dit
-# combien d'autres suivent. Un blocage ne s'agrege jamais, le bilan et la liste JSON gardent
-# toutes les alertes : seul l'affichage se resume. Le filtre lit la sortie entiere, il lui faut
-# le total de chaque nature avant d'imprimer la premiere.
-agreger_sortie() { # lit le texte du rapport sur l'entree standard
+# Aggregation of repetitive warnings, on the readable text only. Beyond 5 warnings of the
+# same nature in a section, the first 3 are printed as is and one line says how many more
+# follow. A blocker is never aggregated, the summary and the JSON list keep every warning:
+# only the display is condensed. The filter reads the whole output, it needs the total of
+# each nature before printing the first one.
+aggregate_output() { # reads the report text on standard input
   LC_ALL=C awk "$NATURE_AWK"'
     { L[NR] = $0 }
     END {
@@ -169,104 +168,104 @@ agreger_sortie() { # lit le texte du rapport sur l'entree standard
         if (T[k] <= 5 || V[k] <= 3) print L[i]
         if (T[k] > 5 && V[k] == 3) {
           n = k; sub(/^[^\034]*\034/, "", n)
-          printf "  [!] ... et %d autres de meme nature (%s)\n", T[k] - 3, n
+          printf "  [!] ... and %d more of the same nature (%s)\n", T[k] - 3, n
         }
       }
     }'
   return 0
 }
 
-# Le fichier vise par une alerte : ce qui precede " : ", ou le premier mot s'il
-# ressemble a un chemin. Vide quand le message ne vise pas un fichier.
-fichier_du_message() { # <message>
+# The file a warning points at: what comes before " : ", or the first word if it
+# looks like a path. Empty when the message does not point at a file.
+file_of_message() { # <message>
   local m="$1" t
   case "$m" in
-    *" : "*) t="${m%% : *}"
-             case "$t" in *" "*) ;; *) printf '%s' "$t"; return 0 ;; esac ;;
+    *": "*) t="${m%%: *}"
+            case "$t" in *" "*) ;; *) printf '%s' "$t"; return 0 ;; esac ;;
   esac
   t="${m%% *}"
   case "$t" in *[.,/]*) printf '%s' "${t%,}" ;; esac
   return 0
 }
 
-signaler() { # <niveau> <message> [<fichier>]
+report() { # <level> <message> [<file>]
   local fic="${3:-}"
-  ALERTES=$((ALERTES + 1))
-  [ "$1" = blocage ] && BLOCAGES=$((BLOCAGES + 1))
+  WARNINGS=$((WARNINGS + 1))
+  [ "$1" = blocker ] && BLOCKERS=$((BLOCKERS + 1))
   if [ "$JSON" -eq 1 ]; then
-    [ -n "$fic" ] || fic="$(fichier_du_message "$2")"
-    JSON_BRUT="$JSON_BRUT$SEC$US$1$US$fic$US$2$RS_"
+    [ -n "$fic" ] || fic="$(file_of_message "$2")"
+    JSON_RAW="$JSON_RAW$SEC$US$1$US$fic$US$2$RS_"
   fi
   return 0
 }
-alerte()  { printf '  [!] %s\n' "$1"; signaler alerte "$@"; }
-blocage() { printf '  [!!] %s\n' "$1"; signaler blocage "$@"; }
-ok()      { printf '  [ok] %s\n' "$1"; }
-info()    { printf '  ... %s\n' "$1"; }
+warn()  { printf '  [!] %s\n' "$1"; report warning "$@"; }
+block() { printf '  [!!] %s\n' "$1"; report blocker "$@"; }
+ok()    { printf '  [ok] %s\n' "$1"; }
+info()  { printf '  ... %s\n' "$1"; }
 
-# Age en jours d'une date, par ctx_jours_depuis, garde en memoire par date : des centaines
-# de fiches partagent quelques dates, et chaque appel coute trois `date`. Le resultat est
-# dans JOURS, vide quand la date est illisible.
+# Age in days of a date, by ctx_days_since, cached per date: hundreds of pages share a few
+# dates, and each call costs three `date`. The result is in DAYS, empty when the date is
+# unreadable.
 AGES=""
-JOURS=""
-jours_depuis() { # <AAAA-MM-JJ> : pose JOURS
-  JOURS=""
+DAYS=""
+days_since() { # <YYYY-MM-DD>: sets DAYS
+  DAYS=""
   [ -n "${1:-}" ] || return 0
-  if valeur_liste "$AGES" "$1"; then JOURS="$VALEUR"; return 0; fi
-  JOURS="$(ctx_jours_depuis "$1")"
-  AGES="$AGES$NL$1=$JOURS"
+  if list_value "$AGES" "$1"; then DAYS="$VALUE"; return 0; fi
+  DAYS="$(ctx_days_since "$1")"
+  AGES="$AGES$NL$1=$DAYS"
   return 0
 }
-# wc rend un nombre cadre d'espaces sous BSD : l'arithmetique les avale, sans un tr de plus.
-lignes() { local n; n="$(wc -l < "$1")"; printf '%s\n' "$((n + 0))"; }
-# Caracteres d'un fichier, pas octets : en C, tr retire les octets de continuation UTF-8
-# (0x80 a 0xBF), il reste un octet par caractere. Une doc en francais accentue pese 2 % de
-# moins en caracteres, un tableau de symboles ou d'emojis beaucoup moins.
-caracteres() { local n; n="$(LC_ALL=C tr -d '\200-\277' < "$1" | wc -c)"; printf '%s\n' "$((n + 0))"; }
-# Meme mesure sur l'entree standard.
-caracteres_stdin() { local n; n="$(LC_ALL=C tr -d '\200-\277' | wc -c)"; printf '%s\n' "$((n + 0))"; }
+# wc pads the number with spaces on BSD: arithmetic swallows them, no extra tr needed.
+count_lines() { local n; n="$(wc -l < "$1")"; printf '%s\n' "$((n + 0))"; }
+# Characters of a file, not bytes: in C, tr removes UTF-8 continuation bytes (0x80 to
+# 0xBF), one byte per character remains. Accented docs weigh 2% less in characters, a table
+# of symbols or emojis much less.
+count_chars() { local n; n="$(LC_ALL=C tr -d '\200-\277' < "$1" | wc -c)"; printf '%s\n' "$((n + 0))"; }
+# Same measure on standard input.
+count_chars_stdin() { local n; n="$(LC_ALL=C tr -d '\200-\277' | wc -c)"; printf '%s\n' "$((n + 0))"; }
 
-# mesure generique : <fichier> <libelle> <alerte> <blocage> [<blocage en caracteres>]
-#                    [<cle de seuils>] [<alerte en caracteres>]
-# Un budget en lignes ne voit pas un fichier de quelques lignes tres larges : le seuil en
-# caracteres l'attrape. Il se surcharge par `seuils: car-<cle>=N` (alerte, le blocage suit).
-mesure() {
-  fmes="$1"; lmes="$2"; ames="$3"; bmes="$4"; omes="${5:-0}"; kmes="${6:-$1}"; acmes="${7:-0}"
-  [ -f "$fmes" ] || return 0
-  # Un fichier ajourne est juge par le cliquet, a la fin de la section 10.
-  ajourne_de "$kmes"
-  if [ -n "$AJ_N" ]; then return 0; fi
-  seuils_de "$kmes" "$ames" "$bmes"
-  ames="$SEUIL_A"; bmes="$SEUIL_B"
-  qmes=0
-  if [ "$omes" -gt 0 ]; then
-    seuils_de "car-$kmes" "$acmes" "$omes"
-    acmes="$SEUIL_A"; omes="$SEUIL_B"
-    qmes="$(caracteres "$fmes")"
+# generic measure: <file> <label> <warning> <blocker> [<blocker in characters>]
+#                  [<thresholds key>] [<warning in characters>]
+# A line budget does not see a file of a few very wide lines: the character threshold
+# catches it. It is overridden by `seuils: car-<key>=N` (warning, the blocker follows).
+measure() {
+  mf="$1"; ml="$2"; ma="$3"; mb="$4"; mo="${5:-0}"; mk="${6:-$1}"; mac="${7:-0}"
+  [ -f "$mf" ] || return 0
+  # A deferred file is judged by the ratchet, at the end of section 10.
+  deferred_of "$mk"
+  if [ -n "$DEF_N" ]; then return 0; fi
+  thresholds_of "$mk" "$ma" "$mb"
+  ma="$THR_A"; mb="$THR_B"
+  mq=0
+  if [ "$mo" -gt 0 ]; then
+    thresholds_of "car-$mk" "$mac" "$mo"
+    mac="$THR_A"; mo="$THR_B"
+    mq="$(count_chars "$mf")"
   fi
-  nmes="$(lignes "$fmes")"
-  if [ "$nmes" -gt "$bmes" ]; then
-    blocage "$lmes : $nmes lignes, seuil de blocage $bmes"
-  elif [ "$omes" -gt 0 ] && [ "$qmes" -gt "$omes" ]; then
-    blocage "$lmes : $qmes caracteres, seuil de blocage $omes"
-  elif [ "$nmes" -gt "$ames" ]; then
-    alerte "$lmes : $nmes lignes, seuil d'alerte $ames"
-  elif [ "$acmes" -gt 0 ] && [ "$qmes" -gt "$acmes" ]; then
-    alerte "$lmes : $qmes caracteres, seuil d'alerte $acmes"
+  mn="$(count_lines "$mf")"
+  if [ "$mn" -gt "$mb" ]; then
+    block "$ml: $mn lines, blocker threshold $mb"
+  elif [ "$mo" -gt 0 ] && [ "$mq" -gt "$mo" ]; then
+    block "$ml: $mq characters, blocker threshold $mo"
+  elif [ "$mn" -gt "$ma" ]; then
+    warn "$ml: $mn lines, warning threshold $ma"
+  elif [ "$mac" -gt 0 ] && [ "$mq" -gt "$mac" ]; then
+    warn "$ml: $mq characters, warning threshold $mac"
   else
-    ok "$lmes : $nmes lignes"
+    ok "$ml: $mn lines"
   fi
 }
 
-# Profondeur de titres. GitLab est le seul guide a publier une regle chiffree de
-# decoupe : au-dela de cinq niveaux, ce sont plusieurs sujets, pas un seul.
-# Un seul awk pour tous les fichiers donnes (un par ligne sur l'entree standard) : sort
-# `profondeur<TAB>chemin` pour ceux qui atteignent cinq niveaux, titres hors blocs de code.
-profondeurs_titres() {
-  local liste
-  liste="$(cat)"
-  [ -n "$liste" ] || return 0
-  printf '%s\n' "$liste" | sed 's|^|./|' | tr '\n' '\000' | xargs -0 awk -v T="$TAB" '
+# Heading depth. GitLab is the only guide to publish a numeric split rule: beyond five
+# levels, it is several topics, not one.
+# A single awk for all the given files (one per line on standard input): prints
+# `depth<TAB>path` for those that reach five levels, headings outside code blocks.
+heading_depths() {
+  local list
+  list="$(cat)"
+  [ -n "$list" ] || return 0
+  printf '%s\n' "$list" | sed 's|^|./|' | tr '\n' '\000' | xargs -0 awk -v T="$TAB" '
     function fin() { if (f != "" && max >= 5) { sub(/^\.\//, "", f); print max T f } }
     FNR == 1 { fin(); f = FILENAME; fence = 0; max = 0 }
     /^```/ { fence = !fence; next }
@@ -275,11 +274,11 @@ profondeurs_titres() {
   return 0
 }
 
-# Chemin declare dans le bloc (`docs:`, `archives:`), sans le / final. `aucune`
-# (ou `non`, `-`) eteint la surface, une ligne absente vaut le defaut.
-chemin_declare() { # <cle> <defaut>
+# Path declared in the block (`docs:`, `archives:`), without the trailing /. `aucune`
+# (or `non`, `-`) turns the surface off, a missing line means the default.
+declared_path() { # <key> <default>
   local v
-  v="$(conv_lire "$1")"
+  v="$(conv_read "$1")"
   case "$v" in
     aucun|aucune|non|none|-) return 0 ;;
     '') v="$2" ;;
@@ -289,152 +288,144 @@ chemin_declare() { # <cle> <defaut>
   printf '%s' "$v"
   return 0
 }
-DOCS_DIR="$(chemin_declare docs docs)"
-ARCH_DIR="$(chemin_declare archives archives)"
-# Repertoire des plans, cle optionnelle `plans:` (plans/ par defaut), sans ./ initial.
-PLANS_DIR="$(chemin_declare plans plans)"
+DOCS_DIR="$(declared_path docs docs)"
+ARCH_DIR="$(declared_path archives archives)"
+# Plans directory, optional key `plans:` (plans/ by default), without a leading ./
+PLANS_DIR="$(declared_path plans plans)"
 while [ "${PLANS_DIR#./}" != "$PLANS_DIR" ]; do PLANS_DIR="${PLANS_DIR#./}"; done
-# Les plans executes (section 11) se lisent dans la sortie de ctx-rotation.sh --plans
-# --dry-run, qui prend plus d'une seconde sur un depot de plusieurs dizaines de plans. Il
-# ne depend que de la racine : il tourne en tache de fond pendant les sections 0 a 10, et la
-# section 11 reprend sa sortie. Le fichier se supprime a la sortie, et la tache s'arrete avec
-# le script. Sans fichier temporaire, la section 11 le lance elle-meme, comme avant.
-if [ "$BUDGET_SEUL" -eq 0 ] && [ -n "$PLANS_DIR" ] && [ -d "$PLANS_DIR" ] && [ -f "$DIR_SCRIPTS/ctx-rotation.sh" ]; then
-  ROT_SORTIE="$(mktemp "${TMPDIR:-/tmp}/ctx-audit.XXXXXX" 2>/dev/null)" || ROT_SORTIE=""
-  if [ -n "$ROT_SORTIE" ]; then
-    bash "$DIR_SCRIPTS/ctx-rotation.sh" --plans --dry-run --root "$ROOT" >"$ROT_SORTIE" 2>/dev/null 3>&- 5>&- &
+# Executed plans (section 11) are read from the output of ctx-rotation.sh --plans
+# --dry-run, which takes more than a second on a repo of several dozen plans. It only
+# depends on the root: it runs in the background during sections 0 to 10, and section 11
+# picks up its output. The file is removed on exit, and the job stops with the script.
+# Without a temporary file, section 11 runs it itself, as before.
+if [ "$BUDGET_ONLY" -eq 0 ] && [ -n "$PLANS_DIR" ] && [ -d "$PLANS_DIR" ] && [ -f "$SCRIPTS_DIR/ctx-rotation.sh" ]; then
+  ROT_OUT="$(mktemp "${TMPDIR:-/tmp}/ctx-audit.XXXXXX" 2>/dev/null)" || ROT_OUT=""
+  if [ -n "$ROT_OUT" ]; then
+    bash "$SCRIPTS_DIR/ctx-rotation.sh" --plans --dry-run --root "$ROOT" >"$ROT_OUT" 2>/dev/null 3>&- 5>&- &
     ROT_PID=$!
   fi
 fi
-LANGUE="$(conv_lire langue)"
-case "$LANGUE" in
-  en*) RE_REPRISE='la reprise|resume|handoff|hand-off|restart'
-       RE_BLOC='reprise|resume|handoff|hand-off|restart'
-       LIB_REPRISE='Resume state'
-       RE_STATUT='Statut|Status'
-       RE_PORTEE='Port|Scope'
-       RE_REMPL='Remplac|Replace|Supersed'
-       RE_ORIGINE='Origine|Origin' ;;
-  *)   RE_REPRISE='la reprise'
-       RE_BLOC='reprise'
-       LIB_REPRISE='Etat a la reprise'
-       RE_STATUT='Statut'
-       RE_PORTEE='Port'
-       RE_REMPL='Remplac'
-       RE_ORIGINE='Origine' ;;
-esac
+# Formats read in French and in English, whatever `langue:` says: a project converted
+# before the translation keeps French files.
+RE_RESUME='la reprise|resume|handoff|hand-off|restart'
+RE_BLOCK='reprise|resume|handoff|hand-off|restart'
+RESUME_LABEL='Resume state'
+RE_STATUS='Statut|Status'
+RE_SCOPE='Port|Scope'
+RE_REPLACED='Remplac|Replace|Supersed'
+RE_ORIGIN='Origine|Origin'
 
-# Repertoires qui ne comptent jamais, ni dans la doc, ni dans la taille du projet : le genere
-# lourd et la cle `ignorer:`, jamais ce que le .gitignore exclut. Calcule une fois ici, les
-# $(exclusions_find) qui suivent lisent la memoire. La section 10 nomme chaque elagage.
-exclusions_charger
-EXCLUS="$(exclusions_find)"
+# Directories that never count, neither in the docs nor in the project size: heavy
+# generated output and the `ignorer:` key, never what .gitignore excludes. Computed once
+# here, the $(exclusions_find) calls that follow read memory. Section 10 names each pruning.
+exclusions_load
+EXCLUDED="$(exclusions_find)"
 if [ -n "$ARCH_DIR" ] && [ "$ARCH_DIR" != archives ]; then
-  EXCLUS="$EXCLUS -not -path ./$ARCH_DIR/*"
+  EXCLUDED="$EXCLUDED -not -path ./$ARCH_DIR/*"
 fi
-# La meme liste, en elagage : find ne descend plus du tout dans .git, node_modules ou dist
-# au lieu de les parcourir pour jeter chaque fichier. Sur un depot de 150 000 fichiers dont
-# 100 000 dans .git, c'est un parcours sept fois plus court pour la meme liste. Elle se
-# derive de exclusions_find par exclusions_prune, une seule source : chaque `-not -path X/*`
-# devient `-path X`. Le dossier d'archives declare, s'il n'est pas archives/, s'ajoute.
+# The same list, as pruning: find no longer descends into .git, node_modules or dist at
+# all instead of walking them to discard each file. On a repo of 150,000 files with
+# 100,000 in .git, the walk is seven times shorter for the same list. It is derived from
+# exclusions_find by exclusions_prune, a single source: each `-not -path X/*` becomes
+# `-path X`. The declared archives folder, if it is not archives/, is added.
 if [ -n "$ARCH_DIR" ] && [ "$ARCH_DIR" != archives ]; then
   PRUNE=( $(exclusions_prune -not -path "./$ARCH_DIR/*") )
 else
   PRUNE=( $(exclusions_prune) )
 fi
-trouver() { # <debut> <tests de find...> : find hors des repertoires exclus, chemins sur la sortie
-  local debut="$1"
+find_pruned() { # <start> <find tests...>: find outside the excluded directories, paths on output
+  local start="$1"
   shift
-  find "$debut" "${PRUNE[@]}" -o "$@" -print 2>/dev/null
+  find "$start" "${PRUNE[@]}" -o "$@" -print 2>/dev/null
   return 0
 }
-SOUS_MODULES="$(sous_modules)"
-# Le bloc est lu une fois, ici. Les exceptions, les seuils et les ajournements se cherchent
-# ensuite en memoire, sans un sous-processus par fichier : sur un depot de plusieurs
-# centaines de fiches, un conv_seuil par fiche (deux sed par entree) coutait des secondes.
+SUBMODULES="$(submodules)"
+# The block is read once, here. Exceptions, thresholds and deferrals are then looked up in
+# memory, without a subprocess per file: on a repo of several hundred pages, one
+# conv_threshold per page (two sed per entry) cost seconds.
 NL='
 '
 TRIM=""
-trim() { # <texte> : pose TRIM, sans les blancs de tete et de fin
+trim() { # <text>: sets TRIM, without leading and trailing blanks
   TRIM="${1#"${1%%[![:space:]]*}"}"
   TRIM="${TRIM%"${TRIM##*[![:space:]]}"}"
   return 0
 }
-# Entrees `nom=valeur` d'une liste du bloc, une par ligne, precedees chacune d'un saut de
-# ligne pour qu'on les retrouve par "$NL$nom=". <valeur numerique> garde celles dont la
-# valeur est un entier, <libre> garde tout ce qui porte un =.
-entrees_du_bloc() { # <cle> <numerique|libre>
-  local e nom val liste=""
+# `name=value` entries of a block list, one per line, each preceded by a newline so that
+# they are found by "$NL$name=". <numeric> keeps those whose value is an integer, <free>
+# keeps everything that carries an =.
+block_entries() { # <key> <numeric|free>
+  local e name val list=""
   while IFS= read -r e; do
     case "$e" in *=*) ;; *) continue ;; esac
-    trim "${e%%=*}"; nom="${TRIM#./}"
+    trim "${e%%=*}"; name="${TRIM#./}"
     trim "${e#*=}"; val="$TRIM"
-    [ -n "$nom" ] || continue
-    if [ "$2" = numerique ]; then
+    [ -n "$name" ] || continue
+    if [ "$2" = numeric ]; then
       case "$val" in ''|*[!0-9]*) continue ;; esac
     fi
-    liste="$liste$NL$nom=$val"
-  done <<FIN
-$(conv_lire "$1" | tr ',' '\n')
-FIN
-  printf '%s' "$liste"
+    list="$list$NL$name=$val"
+  done <<EOT
+$(conv_read "$1" | tr ',' '\n')
+EOT
+  printf '%s' "$list"
   return 0
 }
-# Valeur de `cle=valeur` dans une liste de lignes `\ncle=valeur`, posee dans VALEUR. Code 1 si la
-# cle n'y est pas. Le test `case *"cle="*` est rapide, mais `${liste#*"cle="}` ne l'est pas : sur
-# trois cents entrees, deux secondes. La valeur se lit donc par la longueur du prefixe.
-VALEUR=""
-valeur_liste() { # <liste> <cle>
-  local liste="$1" cle="$2" avant reste
-  VALEUR=""
-  case "$liste" in
-    *"$NL$cle="*)
-      avant="${liste%%"$NL$cle="*}"
-      reste="${liste:$((${#avant} + ${#cle} + 2))}"
-      VALEUR="${reste%%"$NL"*}"
+# Value of `key=value` in a list of lines `\nkey=value`, set in VALUE. Code 1 if the key
+# is not there. The `case *"key="*` test is fast, but `${list#*"key="}` is not: on three
+# hundred entries, two seconds. The value is therefore read through the prefix length.
+VALUE=""
+list_value() { # <list> <key>
+  local list="$1" key="$2" before rest
+  VALUE=""
+  case "$list" in
+    *"$NL$key="*)
+      before="${list%%"$NL$key="*}"
+      rest="${list:$((${#before} + ${#key} + 2))}"
+      VALUE="${rest%%"$NL"*}"
       return 0 ;;
   esac
   return 1
 }
-EXCEPTIONS="$(conv_lire exceptions)"
-EXC_LISTE=""
-if [ -n "$EXCEPTIONS" ]; then EXC_LISTE="$(entrees_du_bloc exceptions libre)"; fi
-exception_de() { # <type> <chemin> : code 0 si `exceptions: type=motif` couvre le chemin (glob shell)
-  local type="$1" chemin="${2#./}" e motif IFS="$NL"
-  [ -n "$EXC_LISTE" ] || return 1
-  for e in $EXC_LISTE; do
+EXCEPTIONS="$(conv_read exceptions)"
+EXC_LIST=""
+if [ -n "$EXCEPTIONS" ]; then EXC_LIST="$(block_entries exceptions free)"; fi
+exception_of() { # <type> <path>: code 0 if `exceptions: type=pattern` covers the path (shell glob)
+  local type="$1" path="${2#./}" e pattern IFS="$NL"
+  [ -n "$EXC_LIST" ] || return 1
+  for e in $EXC_LIST; do
     case "$e" in "$type="*) ;; *) continue ;; esac
-    motif="${e#*=}"
-    [ -n "$motif" ] || continue
-    # dans un case, * couvre aussi les /, donc ** et * se valent ici
+    pattern="${e#*=}"
+    [ -n "$pattern" ] || continue
+    # in a case, * also covers /, so ** and * are equal here
     # shellcheck disable=SC2254
-    case "$chemin" in $motif) return 0 ;; esac
+    case "$path" in $pattern) return 0 ;; esac
   done
   return 1
 }
 
-# Seuils du bloc : `seuils: <fichier>=N` fixe le seuil d'ALERTE du fichier a N. Le
-# seuil de blocage suit dans le meme rapport que les valeurs par defaut de BUDGET.md,
-# arrondi a l'entier.
-SEUILS_DECL="$(conv_lire seuils)"
-SEUILS_LISTE=""
-if [ -n "$SEUILS_DECL" ]; then SEUILS_LISTE="$(entrees_du_bloc seuils numerique)"; fi
-SEUIL_A=0; SEUIL_B=0
-seuils_de() { # <cle> <alerte par defaut> <blocage par defaut> : pose SEUIL_A et SEUIL_B
+# Block thresholds: `seuils: <file>=N` sets the file's WARNING threshold to N. The
+# blocker threshold follows in the same ratio as the BUDGET.md defaults, rounded to the
+# integer.
+THR_DECL="$(conv_read seuils)"
+THR_LIST=""
+if [ -n "$THR_DECL" ]; then THR_LIST="$(block_entries seuils numeric)"; fi
+THR_A=0; THR_B=0
+thresholds_of() { # <key> <default warning> <default blocker>: sets THR_A and THR_B
   local n="$2"
-  SEUIL_A="$2"; SEUIL_B="$3"
-  if valeur_liste "$SEUILS_LISTE" "${1#./}"; then n="$VALEUR"; fi
+  THR_A="$2"; THR_B="$3"
+  if list_value "$THR_LIST" "${1#./}"; then n="$VALUE"; fi
   if [ "$n" != "$2" ] && [ "$2" -gt 0 ]; then
-    SEUIL_A="$n"
-    SEUIL_B=$(( ($3 * n + $2 / 2) / $2 ))
+    THR_A="$n"
+    THR_B=$(( ($3 * n + $2 / 2) / $2 ))
   fi
   return 0
 }
 
-# Seuils par defaut d'un fichier de la convention, ceux de BUDGET.md. DA vaut 0 pour
-# un fichier que le budget ne connait pas.
+# Default thresholds of a convention file, those of BUDGET.md. DA is 0 for a file the
+# budget does not know.
 DA=0; DB=0
-defauts_de() { # <fichier> : pose DA et DB
+defaults_of() { # <file>: sets DA and DB
   DA=0; DB=0
   case "$1" in
     CLAUDE.md)    DA=150; DB=200 ;;
@@ -450,33 +441,33 @@ defauts_de() { # <fichier> : pose DA et DB
   return 0
 }
 
-# Cliquet `ajourne: <fichier>=N@AAAA-MM-JJ` : un depassement gele a sa valeur et a sa date.
-# AJ_LISTE garde `fichier=N` par entree lisible, N vide quand il n'est pas un entier.
-AJOURNE="$(conv_lire ajourne)"
-AJ_N=""
-AJ_LISTE=""
-if [ -n "$AJOURNE" ]; then
+# Ratchet `ajourne: <file>=N@YYYY-MM-DD`: an overshoot is frozen at its value and date.
+# DEF_LIST keeps `file=N` per readable entry, N empty when it is not an integer.
+DEFERRED="$(conv_read ajourne)"
+DEF_N=""
+DEF_LIST=""
+if [ -n "$DEFERRED" ]; then
   while IFS= read -r e; do
     trim "$e"; e="${TRIM#./}"
     case "$e" in *=*@*) ;; *) continue ;; esac
-    trim "${e%%=*}"; nom="$TRIM"
+    trim "${e%%=*}"; name="$TRIM"
     trim "${e#*=}"; trim "${TRIM%%@*}"; val="$TRIM"
     case "$val" in ''|*[!0-9]*) val="" ;; esac
-    AJ_LISTE="$AJ_LISTE$NL$nom=$val"
-  done <<FIN
-$(printf '%s\n' "$AJOURNE" | tr ',' '\n')
-FIN
+    DEF_LIST="$DEF_LIST$NL$name=$val"
+  done <<EOT
+$(printf '%s\n' "$DEFERRED" | tr ',' '\n')
+EOT
 fi
-ajourne_de() { # <fichier> : pose AJ_N (les lignes gelees), vide sans entree lisible
-  AJ_N=""
-  if valeur_liste "$AJ_LISTE" "${1#./}"; then AJ_N="$VALEUR"; fi
+deferred_of() { # <file>: sets DEF_N (the frozen lines), empty without a readable entry
+  DEF_N=""
+  if list_value "$DEF_LIST" "${1#./}"; then DEF_N="$VALUE"; fi
   return 0
 }
 
-# Chemin sans les segments . et .., sans rien lire sur le disque. Le resultat est
-# dans NORM, pas sur la sortie : un sous-shell par lien coute cher sur un gros depot.
+# Path without the . and .. segments, reading nothing from disk. The result is in NORM,
+# not on output: a subshell per link is expensive on a big repo.
 NORM=""
-normaliser() { # <chemin>
+normalize() { # <path>
   local IFS=/ seg out=""
   for seg in $1; do
     case "$seg" in
@@ -493,11 +484,11 @@ normaliser() { # <chemin>
   return 0
 }
 
-# Un chemin sous un sous-module jamais initialise ne se resout pas, et ce n'est pas
-# un defaut de la doc : le lien vaut des qu'on fait `git submodule update`.
-sous_module_vide() { # <chemin normalise> : code 0 s'il est sous un sous-module non initialise
+# A path under a never-initialized submodule does not resolve, and that is not a docs
+# defect: the link is valid as soon as `git submodule update` runs.
+empty_submodule() { # <normalized path>: code 0 if it is under an uninitialized submodule
   local p IFS="$NL"
-  for p in $SOUS_MODULES; do
+  for p in $SUBMODULES; do
     case "$1" in
       "$p"|"$p"/*) if [ ! -e "$p/.git" ]; then return 0; fi ;;
     esac
@@ -505,25 +496,25 @@ sous_module_vide() { # <chemin normalise> : code 0 s'il est sous un sous-module 
   return 1
 }
 
-# Un markdown sans ses blocs de code, ses commentaires HTML, ses spans de code et son code
-# indente : ce qu'ils contiennent est un exemple, jamais un lien ou un chemin de la doc.
-# Un bloc indente de quatre espaces ou d'une tabulation ne vaut comme code que s'il suit une
-# ligne vide et ne vit pas dans une liste : une sous-liste indentee reste de la doc.
-# Le meme programme sert aux deux usages : le texte nettoye d'un fichier (liens = 0), ou les
-# liens `](cible)` de plusieurs fichiers d'un coup, un par ligne `fichier<US>cible` (liens = 1).
+# A markdown without its code blocks, HTML comments, code spans and indented code: what
+# they contain is an example, never a link or a path of the docs.
+# A block indented by four spaces or a tab only counts as code if it follows a blank line
+# and does not live in a list: an indented sub-list remains docs.
+# The same program serves both uses: the cleaned text of a file (links = 0), or the
+# `](target)` links of several files at once, one per line `file<US>target` (links = 1).
 AWK_MD='
-  BEGIN { vide = 1 }
-  FNR == 1 { fence = 0; com = 0; code = 0; liste = 0; vide = 1 }
+  BEGIN { blank = 1 }
+  FNR == 1 { fence = 0; com = 0; code = 0; list = 0; blank = 1 }
   /^[ \t]*```/ { fence = !fence; next }
   fence { next }
   {
     ind = ($0 ~ /^(    |\t)/)
-    if ($0 ~ /^[ \t]*$/) { vide = 1; if (!code && !liens) print; next }
-    if (ind && (code || (vide && !liste))) { code = 1; vide = 0; next }
+    if ($0 ~ /^[ \t]*$/) { blank = 1; if (!code && !links) print; next }
+    if (ind && (code || (blank && !list))) { code = 1; blank = 0; next }
     code = 0
-    if ($0 ~ /^ ? ? ?([-*+]|[0-9]+[.)])[ \t]/) liste = 1
-    else if (vide && $0 ~ /^[^ \t]/) liste = 0
-    vide = 0
+    if ($0 ~ /^ ? ? ?([-*+]|[0-9]+[.)])[ \t]/) list = 1
+    else if (blank && $0 ~ /^[^ \t]/) list = 0
+    blank = 0
     l = $0; out = ""
     while (length(l) > 0) {
       if (com) {
@@ -543,7 +534,7 @@ AWK_MD='
       res = res substr(out, 1, i - 1)
       out = substr(rest, j + 1)
     }
-    if (!liens) { print res out; next }
+    if (!links) { print res out; next }
     t = res out
     f = FILENAME; sub(/^\.\//, "", f)
     while (match(t, /\]\([^)#][^)]*\)/)) {
@@ -551,90 +542,90 @@ AWK_MD='
       t = substr(t, RSTART + RLENGTH)
     }
   }'
-md_sans_code() { # <fichier>
-  awk -v liens=0 "$AWK_MD" "$1" 2>/dev/null
+md_no_code() { # <file>
+  awk -v links=0 "$AWK_MD" "$1" 2>/dev/null
   return 0
 }
-# Les liens de tous les fichiers d'une liste (un chemin par ligne sur l'entree standard),
-# un seul awk au lieu d'un sous-processus par fichier. Rend `fichier<US>cible`.
-liens_tous() {
-  local liste
-  liste="$(cat)"
-  [ -n "$liste" ] || return 0
-  printf '%s\n' "$liste" | sed 's|^|./|' | tr '\n' '\000' | xargs -0 awk -v liens=1 -v U="$US" "$AWK_MD" 2>/dev/null || true
-  return 0
-}
-
-# Les liens relatifs d'un markdown, un par ligne, ancre et exemples exclus.
-liens_de() { # <fichier>
-  md_sans_code "$1" | grep -oE '\]\([^)#][^)]*\)' | sed 's/^](//; s/)$//' || true
+# The links of all the files of a list (one path per line on standard input), a single awk
+# instead of a subprocess per file. Prints `file<US>target`.
+links_all() {
+  local list
+  list="$(cat)"
+  [ -n "$list" ] || return 0
+  printf '%s\n' "$list" | sed 's|^|./|' | tr '\n' '\000' | xargs -0 awk -v links=1 -v U="$US" "$AWK_MD" 2>/dev/null || true
   return 0
 }
 
-# Un lien qui ne mene pas a un chemin du depot : un schema (http:, https:, mailto:, tel:,
-# ftp:, sms:...), un lien relatif au schema (//cdn.exemple.fr/x.js), une ancre seule, un
-# emplacement a remplir d'un gabarit. Le schema compte deux lettres au moins, pour ne pas
-# prendre un chemin Windows pour un schema. `http-api.md` est un fichier, pas un schema.
-RE_SCHEMA='^[A-Za-z][A-Za-z0-9+.-]+:'
-lien_externe() { # <lien> : code 0 si ce n'est pas un chemin du depot
+# The relative links of a markdown, one per line, anchors and examples excluded.
+links_of() { # <file>
+  md_no_code "$1" | grep -oE '\]\([^)#][^)]*\)' | sed 's/^](//; s/)$//' || true
+  return 0
+}
+
+# A link that does not lead to a repo path: a scheme (http:, https:, mailto:, tel:,
+# ftp:, sms:...), a scheme-relative link (//cdn.example.com/x.js), a bare anchor, a
+# template placeholder. The scheme has at least two letters, so as not to take a Windows
+# path for a scheme. `http-api.md` is a file, not a scheme.
+RE_SCHEME='^[A-Za-z][A-Za-z0-9+.-]+:'
+external_link() { # <link>: code 0 if it is not a repo path
   case "$1" in
     '#'*|//*|*'<'*|*'{{'*) return 0 ;;
   esac
-  if [[ "$1" =~ $RE_SCHEMA ]]; then return 0; fi
+  if [[ "$1" =~ $RE_SCHEME ]]; then return 0; fi
   return 1
 }
 
-# La cible d'un lien markdown : `[a](x.md "titre")` pointe vers x.md, le titre n'en fait pas
-# partie. Le resultat est dans CIBLE, ancre retiree.
+# The target of a markdown link: `[a](x.md "title")` points to x.md, the title is not part
+# of it. The result is in TARGET, anchor removed.
 SQ="'"
-CIBLE=""
-cible_du_lien() { # <texte entre parentheses>
+TARGET=""
+link_target() { # <text between parentheses>
   local l="$1"
   case "$l" in
     *' "'*) l="${l%% \"*}" ;;
     *" $SQ"*) l="${l%% $SQ*}" ;;
   esac
-  CIBLE="${l%%#*}"
+  TARGET="${l%%#*}"
   return 0
 }
 
-# Fiches atteintes depuis l'index par des liens, trois sauts au plus.
-fiches_atteintes() { # <index> -> un chemin par ligne
-  local front="$1" tous="$1" suivants f dir lien cible i=0
+# Pages reached from the index by links, three hops at most.
+pages_reached() { # <index> -> one path per line
+  local front="$1" all="$1" next f dir link target i=0
   while [ "$i" -lt 3 ] && [ -n "$front" ]; do
-    suivants=""
+    next=""
     while IFS= read -r f; do
       [ -f "$f" ] || continue
       dir="$(dirname "$f")"
-      while IFS= read -r lien; do
-        [ -n "$lien" ] || continue
-        if lien_externe "$lien"; then continue; fi
-        cible_du_lien "$lien"; cible="$CIBLE"
-        [ -n "$cible" ] || continue
-        normaliser "$dir/$cible"
-        cible="$NORM"
-        case "$cible" in *.md) ;; *) continue ;; esac
-        if grep -qxF "$cible" <<<"$tous"; then continue; fi
-        tous="$tous
-$cible"
-        suivants="${suivants:+$suivants
-}$cible"
-      done <<FIN2
-$(liens_de "$f")
-FIN2
-    done <<FIN
+      while IFS= read -r link; do
+        [ -n "$link" ] || continue
+        if external_link "$link"; then continue; fi
+        link_target "$link"; target="$TARGET"
+        [ -n "$target" ] || continue
+        normalize "$dir/$target"
+        target="$NORM"
+        case "$target" in *.md) ;; *) continue ;; esac
+        if grep -qxF "$target" <<<"$all"; then continue; fi
+        all="$all
+$target"
+        next="${next:+$next
+}$target"
+      done <<EOT2
+$(links_of "$f")
+EOT2
+    done <<EOT
 $front
-FIN
-    front="$suivants"
+EOT
+    front="$next"
     i=$((i + 1))
   done
-  printf '%s\n' "$tous"
+  printf '%s\n' "$all"
   return 0
 }
 
-# CLAUDE.md et AGENTS.md sont-ils deja raccordes ? Lien symbolique dans un sens ou
-# dans l'autre, ou ligne `@AGENTS.md` dans le CLAUDE.md.
-agents_raccorde() {
+# Are CLAUDE.md and AGENTS.md already linked? Symbolic link in either direction, or an
+# `@AGENTS.md` line in CLAUDE.md.
+agents_linked() {
   if [ -L CLAUDE.md ] || [ -L AGENTS.md ]; then
     if [ CLAUDE.md -ef AGENTS.md ]; then return 0; fi
   fi
@@ -642,86 +633,85 @@ agents_raccorde() {
   return 1
 }
 
-# Le fichier qui porte vraiment les regles quand CLAUDE.md n'est qu'un renvoi : sa
-# cible s'il est lien symbolique, le premier import s'il ne contient que des
-# imports. Vide quand CLAUDE.md porte ses propres regles ou n'existe pas.
-claude_renvoi() {
-  local autres premier
+# The file that really carries the rules when CLAUDE.md is only a redirect: its target if
+# it is a symbolic link, the first import if it contains only imports. Empty when CLAUDE.md
+# carries its own rules or does not exist.
+claude_redirect() {
+  local others first
   [ -f CLAUDE.md ] || return 0
   if [ -L CLAUDE.md ]; then
     readlink CLAUDE.md
     return 0
   fi
-  autres="$(grep -m1 -vE '^[[:space:]]*(@[^[:space:]]+[[:space:]]*)?$' CLAUDE.md || true)"
-  premier="$(grep -m1 -E '^[[:space:]]*@' CLAUDE.md || true)"
-  if [ -z "$autres" ] && [ -n "$premier" ]; then
-    premier="${premier#"${premier%%[![:space:]]*}"}"
-    premier="${premier#@}"
-    printf '%s\n' "${premier%%[[:space:]]*}"
+  others="$(grep -m1 -vE '^[[:space:]]*(@[^[:space:]]+[[:space:]]*)?$' CLAUDE.md || true)"
+  first="$(grep -m1 -E '^[[:space:]]*@' CLAUDE.md || true)"
+  if [ -z "$others" ] && [ -n "$first" ]; then
+    first="${first#"${first%%[![:space:]]*}"}"
+    first="${first#@}"
+    printf '%s\n' "${first%%[[:space:]]*}"
   fi
   return 0
 }
-CLAUDE_RENVOI="$(claude_renvoi)"
+CLAUDE_REDIRECT="$(claude_redirect)"
 
-# Une valeur de test evidente dans un fichier de test : la fixture d'un scanner
-# anti-fuite, pas une cle qui a fuite. Les deux conditions ensemble, une vraie
-# valeur dans un fichier de test reste signalee.
-secret_factice() { # <ligne de git grep : chemin:ligne:contenu>
-  local chemin="${1%%:*}" contenu
-  case "/$chemin" in
+# An obvious test value in a test file: the fixture of a leak scanner, not a key that
+# leaked. Both conditions together, a real value in a test file is still reported.
+fake_secret() { # <git grep line: path:line:content>
+  local path="${1%%:*}" content
+  case "/$path" in
     */tests/*|*/test/*|*/__tests__/*|*/fixtures/*|*/spec/*|*/test_*|*_test.*|*.test.*|*.spec.*) ;;
     *) return 1 ;;
   esac
-  contenu="${1#*:}"; contenu="${contenu#*:}"
-  grep -qiE 'factice|fake|dummy|example|exemple|placeholder|changeme|redacted|xxxx|0000|(.)\1\1\1\1\1\1' <<<"$contenu"
+  content="${1#*:}"; content="${content#*:}"
+  grep -qiE 'factice|fake|dummy|example|exemple|placeholder|changeme|redacted|xxxx|0000|(.)\1\1\1\1\1\1' <<<"$content"
 }
 
-# fichiers markdown de doc, hors archives et hors dependances
+# markdown doc files, outside archives and dependencies
 docs_md() {
-  trouver . -name '*.md' | sed 's|^\./||' | sort
+  find_pruned . -name '*.md' | sed 's|^\./||' | sort
 }
 
-# Un journal est un markdown a entrees datees. Le CHANGELOG porte le format que le
-# bloc declare, ou celui que `journal_detecter` trouve. Les autres journaux de la
-# doc sont lus en `## ...AAAA-MM-JJ`, le format le plus courant.
-MOTIF_DATE_TITRE="$(journal_motif date-titre)"
-JMOTIF=""
-motif_du_journal() { # <fichier> : pose JMOTIF, vide si le journal n'a aucun format reconnu
+# A log is a markdown with dated entries. The CHANGELOG carries the format the block
+# declares, or the one `log_detect` finds. The other logs of the docs are read as
+# `## ...YYYY-MM-DD`, the most common format.
+RE_DATE_TITLE="$(log_pattern date-titre)"
+LOG_RE=""
+log_pattern_of() { # <file>: sets LOG_RE, empty if the log has no recognized format
   if [ "$1" = CHANGELOG.md ]; then
-    JMOTIF="$(journal_motif "$(journal_detecter CHANGELOG.md)")"
+    LOG_RE="$(log_pattern "$(log_detect CHANGELOG.md)")"
   else
-    JMOTIF="$MOTIF_DATE_TITRE"
+    LOG_RE="$RE_DATE_TITLE"
   fi
   return 0
 }
-nb_entrees_datees() { # <fichier> -> nombre d'entrees datees
-  motif_du_journal "$1"
-  if [ -n "$JMOTIF" ]; then grep -cE "$JMOTIF" "$1" 2>/dev/null || true; else echo 0; fi
+count_dated_entries() { # <file> -> number of dated entries
+  log_pattern_of "$1"
+  if [ -n "$LOG_RE" ]; then grep -cE "$LOG_RE" "$1" 2>/dev/null || true; else echo 0; fi
   return 0
 }
 
-# Longueur du bloc « Etat a la reprise » : du titre qui contient « reprise » au
-# prochain titre de niveau 2.
-bloc_reprise_lignes() { # <TODOS.md> -> nombre de lignes, 0 si absent
-  awk -v re="$RE_BLOC" 'BEGIN{n=0; dans=0}
-       /^## /{ if (dans) exit; if (tolower($0) ~ re) dans=1 }
-       dans{n++}
+# Length of the "Resume state" block: from the heading that contains "resume" (or the
+# French "reprise") to the next level-2 heading.
+resume_block_lines() { # <TODOS.md> -> number of lines, 0 if absent
+  awk -v re="$RE_BLOCK" 'BEGIN{n=0; inside=0}
+       /^## /{ if (inside) exit; if (tolower($0) ~ re) inside=1 }
+       inside{n++}
        END{print n}' "$1" 2>/dev/null || echo 0
 }
 
-# Section la plus longue d'un markdown, en lignes, avec son titre.
-section_max() { # <fichier> -> "N titre"
+# Longest section of a markdown, in lines, with its heading.
+section_max() { # <file> -> "N heading"
   awk '/^## /{ if (t != "") print n, t; t=$0; n=0 } { n++ } END{ if (t != "") print n, t }' "$1" 2>/dev/null \
     | sort -rn | sed -n '1p'
 }
 
-# Les entrees d'un journal dans l'ordre du fichier, une ligne "N titre" chacune.
-entrees_du_journal() { # <fichier>
+# The entries of a log in file order, one line "N heading" each.
+log_entries() { # <file>
   local f="$1" total
-  motif_du_journal "$f"
-  [ -n "$JMOTIF" ] || return 0
+  log_pattern_of "$f"
+  [ -n "$LOG_RE" ] || return 0
   total="$(awk 'END{print NR}' "$f")"
-  grep -nE "$JMOTIF" "$f" 2>/dev/null | awk -F: -v total="$total" '
+  grep -nE "$LOG_RE" "$f" 2>/dev/null | awk -F: -v total="$total" '
     { n = $1; t = substr($0, length($1) + 2)
       if (p) print n - p, pt
       p = n; pt = t }
@@ -729,22 +719,22 @@ entrees_du_journal() { # <fichier>
   return 0
 }
 
-# Entree la plus longue d'un journal, en lignes.
-entree_max() { # <fichier> -> "N titre"
-  entrees_du_journal "$1" | sort -rn | sed -n '1p'
+# Longest entry of a log, in lines.
+longest_entry() { # <file> -> "N heading"
+  log_entries "$1" | sort -rn | sed -n '1p'
   return 0
 }
 
-# Les en-tetes des fiches, lus d'un coup : un awk pour toutes au lieu d'un head et de deux grep
-# par fiche. Une ligne par fiche, `chemin<US>statut<US>date<US>portee` : la ligne de statut
-# dans les six premieres lignes, la premiere date qu'elle porte, la ligne de portee dans les
-# huit premieres. Une fiche vide n'a pas de ligne, l'appelant la traite a part.
-entetes_fiches() { # <fiches, une par ligne, sur l'entree standard>
-  local liste
-  liste="$(cat)"
-  [ -n "$liste" ] || return 0
-  printf '%s\n' "$liste" | sed 's|^|./|' | tr '\n' '\000' \
-    | xargs -0 awk -v rs="$RE_STATUT" -v rp="$RE_PORTEE" -v U="$US" '
+# The page headers, read in one go: one awk for all of them instead of a head and two grep
+# per page. One line per page, `path<US>status<US>date<US>scope`: the status line within
+# the first six lines, the first date it carries, the scope line within the first eight.
+# An empty page has no line, the caller handles it separately.
+page_headers() { # <pages, one per line, on standard input>
+  local list
+  list="$(cat)"
+  [ -n "$list" ] || return 0
+  printf '%s\n' "$list" | sed 's|^|./|' | tr '\n' '\000' \
+    | xargs -0 awk -v rs="$RE_STATUS" -v rp="$RE_SCOPE" -v U="$US" '
         function fin() { if (f != "") { sub(/^\.\//, "", f); print f U st U da U po } }
         FNR == 1 { fin(); f = FILENAME; st = ""; da = ""; po = "" }
         FNR <= 6 && st == "" && $0 ~ rs {
@@ -757,45 +747,45 @@ entetes_fiches() { # <fiches, une par ligne, sur l'entree standard>
 }
 
 echo "=============================================="
-echo " Audit de contexte : $(basename "$ROOT")"
+echo " Context audit: $(basename "$ROOT")"
 echo " $TODAY"
 echo "=============================================="
 
-PROFIL="$(conv_lire profil)"
-TAILLE_DECLAREE="$(conv_lire taille)"
-BLOC_V="$(conv_version)"
+PROFILE="$(conv_read profil)"
+DECLARED_SIZE="$(conv_read taille)"
+BLOCK_V="$(conv_version)"
 
-# Les zones : un CODEMAP.md seul dans un sous-repertoire, sans TODOS ni
-# CHANGELOG a cote. Un niveau autonome porte les trois piliers.
-NIVEAUX=""
+# Zones: a CODEMAP.md alone in a subdirectory, with no TODOS or CHANGELOG beside it. A
+# standalone level carries the three pillars.
+LEVELS=""
 ZONES=""
-for c in $(trouver . -name CODEMAP.md -path './*/*' | sort); do
+for c in $(find_pruned . -name CODEMAP.md -path './*/*' | sort); do
   d="${c%/CODEMAP.md}"; d="${d#./}"
   grep -q '{{' "$c" 2>/dev/null && continue
   if [ -f "$d/TODOS.md" ] && [ -f "$d/CHANGELOG.md" ]; then
-    NIVEAUX="$NIVEAUX $d"
+    LEVELS="$LEVELS $d"
   else
     ZONES="$ZONES $d"
   fi
 done
 
-if [ "$BUDGET_SEUL" -eq 0 ]; then
+if [ "$BUDGET_ONLY" -eq 0 ]; then
 
-# --- 0. le terrain ------------------------------------------------------------
-# Ce que le projet porte deja. Un projet neuf n'a rien, un projet existant a
-# souvent une doc rangee autrement, et parfois une autre convention d'agent qui
-# ferait une seconde source de verite. On se greffe sur l'existant, on ne pose
-# pas des gabarits vides a cote.
+# --- 0. terrain ---------------------------------------------------------------
+# What the project already carries. A new project has nothing, an existing one often has
+# docs filed some other way, and sometimes another agent convention that would make a
+# second source of truth. We graft onto what exists, we do not drop empty templates next
+# to it.
 echo
-echo "0. Le terrain"
+echo "0. Terrain"
 SEC=0
 
-KIT_COMPLET=1
+KIT_COMPLETE=1
 for f in CODEMAP.md TODOS.md CHANGELOG.md; do
-  [ -f "$f" ] || KIT_COMPLET=0
+  [ -f "$f" ] || KIT_COMPLETE=0
 done
 
-# Documentation deja presente, hors kit
+# Documentation already present, outside the kit
 DOC_DIRS=""
 for d in docs doc documentation wiki .claude/docs notes; do
   [ -d "$d" ] && DOC_DIRS="$DOC_DIRS $d"
@@ -804,451 +794,449 @@ ADR_DIRS=""
 for d in adr docs/adr doc/adr docs/decisions docs/architecture/decisions; do
   [ -d "$d" ] && ADR_DIRS="$ADR_DIRS $d"
 done
-RACINE_MD="$(find . -maxdepth 1 -name '*.md' 2>/dev/null | sed 's|^\./||' \
+ROOT_MD="$(find . -maxdepth 1 -name '*.md' 2>/dev/null | sed 's|^\./||' \
   | grep -vE '^(CODEMAP|TODOS|CHANGELOG|CLAUDE|AGENTS|README|MEMORY)\.md$' | sort || true)"
 
-[ -n "$DOC_DIRS" ] && info "documentation existante :$DOC_DIRS"
-[ -n "$ADR_DIRS" ] && info "decisions existantes :$ADR_DIRS"
-if [ -n "$RACINE_MD" ]; then
-  info "markdown a la racine, hors kit : $(printf '%s ' $RACINE_MD)"
-  [ "$KIT_COMPLET" -eq 0 ] && info "  chacun a un proprietaire dans la convention, voir references/PROFILS-PROJETS.md"
+[ -n "$DOC_DIRS" ] && info "existing documentation:$DOC_DIRS"
+[ -n "$ADR_DIRS" ] && info "existing decisions:$ADR_DIRS"
+if [ -n "$ROOT_MD" ]; then
+  info "markdown at the root, outside the kit: $(printf '%s ' $ROOT_MD)"
+  [ "$KIT_COMPLETE" -eq 0 ] && info "  each has an owner in the convention, see references/PROJECT-PROFILES.md"
 fi
 
-# Conventions d'agent concurrentes. Deux sources de verite divergent toujours,
-# et rien ne le signale au moment ou ça arrive.
-CONCUR=""
+# Competing agent conventions. Two sources of truth always diverge, and nothing says so
+# when it happens.
+COMPETING=""
 for c in AGENTS.md GEMINI.md .cursorrules .clinerules .windsurfrules CONVENTIONS.md \
          .github/copilot-instructions.md .cursor/rules memory-bank .roo; do
-  [ -e "$c" ] && CONCUR="$CONCUR $c"
+  [ -e "$c" ] && COMPETING="$COMPETING $c"
 done
-if [ -n "$CONCUR" ]; then
-  for c in $CONCUR; do
+if [ -n "$COMPETING" ]; then
+  for c in $COMPETING; do
     case "$c" in
       AGENTS.md)
-        if [ -f CLAUDE.md ] && agents_raccorde; then
-          info "AGENTS.md est raccorde a CLAUDE.md (lien symbolique ou @AGENTS.md), une seule source de regles"
+        if [ -f CLAUDE.md ] && agents_linked; then
+          info "AGENTS.md is linked to CLAUDE.md (symbolic link or @AGENTS.md), a single source of rules"
         elif [ -f CLAUDE.md ]; then
-          alerte "AGENTS.md et CLAUDE.md coexistent. Claude Code ne lit pas AGENTS.md, Codex ne lit pas CLAUDE.md. Sans raccord, deux sources divergent en silence. Le raccord est une ligne @AGENTS.md en tete du CLAUDE.md, ou un lien symbolique"
+          warn "AGENTS.md and CLAUDE.md coexist. Claude Code does not read AGENTS.md, Codex does not read CLAUDE.md. Without a link, two sources diverge in silence. The link is an @AGENTS.md line at the top of CLAUDE.md, or a symbolic link"
         else
-          info "AGENTS.md present, c'est le porteur des regles ici. La convention s'y greffe au lieu de creer un CLAUDE.md"
+          info "AGENTS.md present, it carries the rules here. The convention grafts onto it instead of creating a CLAUDE.md"
         fi ;;
       memory-bank|.roo)
-        alerte "$c present, c'est une convention de memoire d'agent concurrente. Elle porte le meme savoir que les piliers, et deux copies divergent. Choisir laquelle fait foi et archiver l'autre" ;;
+        warn "$c present, it is a competing agent memory convention. It carries the same knowledge as the pillars, and two copies diverge. Choose which one holds and archive the other" ;;
       *)
-        info "$c present, autre convention d'agent. Verifier qu'elle ne redit pas les piliers" ;;
+        info "$c present, another agent convention. Check that it does not repeat the pillars" ;;
     esac
   done
 fi
 
-# Version du bloc. Un bloc sans ligne `version:` ou en version ancienne vient d'un
-# skill plus vieux : le mode migrer du skill le remet d'aplomb. Sans bloc du tout, la
-# section 1 le dit et ctx-init.sh le pose, il n'y a rien a migrer.
-case "$BLOC_V" in
+# Block version. A block without a `version:` line or in an old version comes from an older
+# skill: the UPGRADE mode of the skill fixes it. With no block at all, section 1 says so and
+# ctx-init.sh adds it, there is nothing to upgrade.
+case "$BLOCK_V" in
   0) ;;
   ''|*[!0-9]*)
-    alerte "le bloc contexte:convention porte une version illisible ($BLOC_V). Lancer le mode migrer du skill" "$(conv_trouver)" ;;
+    warn "the contexte:convention block carries an unreadable version ($BLOCK_V). Run the UPGRADE mode of the skill" "$(conv_find)" ;;
   *)
-    if [ "$BLOC_V" -lt "$CTX_VERSION" ]; then
-      if [ -z "$(conv_lire version)" ]; then
-        alerte "le bloc contexte:convention n'a pas de ligne version:, il vient d'une version ancienne du skill (la courante est la $CTX_VERSION). Lancer le mode migrer du skill" "$(conv_trouver)"
+    if [ "$BLOCK_V" -lt "$CTX_VERSION" ]; then
+      if [ -z "$(conv_read version)" ]; then
+        warn "the contexte:convention block has no version: line, it comes from an old version of the skill (the current one is $CTX_VERSION). Run the UPGRADE mode of the skill" "$(conv_find)"
       else
-        alerte "le bloc contexte:convention est en version $BLOC_V, la courante est la $CTX_VERSION. Lancer le mode migrer du skill" "$(conv_trouver)"
+        warn "the contexte:convention block is at version $BLOCK_V, the current one is $CTX_VERSION. Run the UPGRADE mode of the skill" "$(conv_find)"
       fi
     fi ;;
 esac
 
-if [ "$KIT_COMPLET" -eq 1 ] && [ -z "$CONCUR" ]; then
-  ok "un seul porteur de convention, rien qui concurrence les piliers"
-elif [ "$KIT_COMPLET" -eq 0 ]; then
-  info "le kit est incomplet, voir la section 1. Le mode INIT se greffe sur ce qui existe"
+if [ "$KIT_COMPLETE" -eq 1 ] && [ -z "$COMPETING" ]; then
+  ok "a single convention carrier, nothing competes with the pillars"
+elif [ "$KIT_COMPLETE" -eq 0 ]; then
+  info "the kit is incomplete, see section 1. The SETUP mode grafts onto what exists"
 fi
 
-# --- 1. presence du kit -------------------------------------------------------
+# --- 1. kit presence ----------------------------------------------------------
 echo
-echo "1. Kit de contexte"
+echo "1. Context kit"
 SEC=1
 for f in CODEMAP.md TODOS.md CHANGELOG.md; do
-  if [ -f "$f" ]; then ok "$f"; else alerte "$f manquant"; fi
+  if [ -f "$f" ]; then ok "$f"; else warn "$f missing"; fi
 done
 if [ ! -f CLAUDE.md ]; then
-  info "CLAUDE.md absent, les regles du projet n'ont pas de support"
-elif [ -n "$CLAUDE_RENVOI" ]; then
-  info "CLAUDE.md se reduit a un renvoi vers $CLAUDE_RENVOI, c'est ce fichier qui porte les regles"
-  # Un renvoi qui ne mene a rien, ou a un fichier vide : aucune regle n'est chargee.
-  if [ ! -f "$CLAUDE_RENVOI" ]; then
-    alerte "CLAUDE.md renvoie vers $CLAUDE_RENVOI, qui n'existe pas. Aucune regle de projet n'est chargee" CLAUDE.md
-  elif ! grep -q '[^[:space:]]' "$CLAUDE_RENVOI" 2>/dev/null; then
-    alerte "CLAUDE.md renvoie vers $CLAUDE_RENVOI, qui est vide. Aucune regle de projet n'est chargee" CLAUDE.md
+  info "CLAUDE.md absent, the project rules have no support"
+elif [ -n "$CLAUDE_REDIRECT" ]; then
+  info "CLAUDE.md is only a redirect to $CLAUDE_REDIRECT, that file carries the rules"
+  # A redirect that leads nowhere, or to an empty file: no rule is loaded.
+  if [ ! -f "$CLAUDE_REDIRECT" ]; then
+    warn "CLAUDE.md redirects to $CLAUDE_REDIRECT, which does not exist. No project rule is loaded" CLAUDE.md
+  elif ! grep -q '[^[:space:]]' "$CLAUDE_REDIRECT" 2>/dev/null; then
+    warn "CLAUDE.md redirects to $CLAUDE_REDIRECT, which is empty. No project rule is loaded" CLAUDE.md
   fi
 elif ! grep -q '[^[:space:]]' CLAUDE.md 2>/dev/null; then
-  alerte "CLAUDE.md est vide. Les regles du projet n'ont aucun support, ou un renvoi @AGENTS.md si un autre fichier les porte" CLAUDE.md
+  warn "CLAUDE.md is empty. The project rules have no support, or an @AGENTS.md redirect if another file carries them" CLAUDE.md
 else
   ok "CLAUDE.md"
 fi
-# Vestige d'une convention a quatre piliers. Le contenu a un proprietaire ailleurs
-# maintenant, le laisser en place cree deux sources de verite.
-# Un projet qui s'en sert volontairement le declare dans ecarts: (MEMORY.md=<justification>) :
-# l'alerte devient une information qui cite la justification.
+# Leftover of a four-pillar convention. The content has an owner elsewhere now, leaving it
+# in place creates two sources of truth.
+# A project that uses it on purpose declares it in ecarts: (MEMORY.md=<justification>):
+# the warning becomes an info that quotes the justification.
 if [ -f MEMORY.md ]; then
-  ECART_MEMORY=""
-  case "$(conv_lire ecarts)" in
+  MEMORY_GAP=""
+  case "$(conv_read ecarts)" in
     *MEMORY.md=*)
-      ECART_MEMORY="$(conv_lire ecarts | sed -e 's/^.*MEMORY\.md=//' -e 's/,[[:space:]]*[A-Za-z][A-Za-z0-9._-]*=.*$//' -e 's/[[:space:]]*$//')"
+      MEMORY_GAP="$(conv_read ecarts | sed -e 's/^.*MEMORY\.md=//' -e 's/,[[:space:]]*[A-Za-z][A-Za-z0-9._-]*=.*$//' -e 's/[[:space:]]*$//')"
       ;;
   esac
-  if [ -n "$ECART_MEMORY" ]; then
-    info "MEMORY.md commite a la racine, ecart declare dans ecarts: $ECART_MEMORY"
+  if [ -n "$MEMORY_GAP" ]; then
+    info "MEMORY.md committed at the root, gap declared in ecarts: $MEMORY_GAP"
   else
-    alerte "MEMORY.md present, la convention n'a plus de pilier memoire. Declarer l'ecart dans la ligne ecarts: du bloc (MEMORY.md=<justification>), ou drainer le fichier : decisions vers docs/decisions/, pieges vers la fiche du module ou les zones sensibles du CODEMAP, preferences vers CLAUDE.md"
+    warn "MEMORY.md present, the convention no longer has a memory pillar. Declare the gap in the ecarts: line of the block (MEMORY.md=<justification>), or drain the file: decisions to docs/decisions/, pitfalls to the module page or the sensitive zones of the CODEMAP, preferences to CLAUDE.md"
   fi
 fi
 if [ -z "$DOCS_DIR" ]; then
-  info "le bloc declare docs: aucune, pas de fiches dans ce projet"
+  info "the block declares docs: aucune, no pages in this project"
 elif [ -d "$DOCS_DIR" ]; then
   ok "$DOCS_DIR/"
-  [ -f "$DOCS_DIR/README.md" ] || alerte "$DOCS_DIR/README.md manquant, l'index est obligatoire"
+  [ -f "$DOCS_DIR/README.md" ] || warn "$DOCS_DIR/README.md missing, the index is required"
 else
-  alerte "$DOCS_DIR/ manquant"
+  warn "$DOCS_DIR/ missing"
 fi
 if [ -z "$ARCH_DIR" ]; then
-  info "le bloc declare archives: aucune, rien n'est archive dans ce projet"
+  info "the block declares archives: aucune, nothing is archived in this project"
 elif [ -d "$ARCH_DIR" ]; then
   ok "$ARCH_DIR/"
-  [ -f "$ARCH_DIR/README.md" ] || alerte "$ARCH_DIR/README.md manquant, l'index est obligatoire"
+  [ -f "$ARCH_DIR/README.md" ] || warn "$ARCH_DIR/README.md missing, the index is required"
 else
-  alerte "$ARCH_DIR/ manquant"
+  warn "$ARCH_DIR/ missing"
 fi
 
-BLOC_FIC="$(conv_trouver)"
-if [ -n "$PROFIL" ]; then
-  info "profil declare : $PROFIL"
-elif [ -n "$BLOC_FIC" ]; then
-  info "bloc contexte:convention lu dans $BLOC_FIC, sans profil declare"
+BLOCK_FILE="$(conv_find)"
+if [ -n "$PROFILE" ]; then
+  info "declared profile: $PROFILE"
+elif [ -n "$BLOCK_FILE" ]; then
+  info "contexte:convention block read in $BLOCK_FILE, no declared profile"
 else
-  info "aucun bloc contexte:convention, chemins par defaut"
+  info "no contexte:convention block, default paths"
 fi
 
-# Sans --root, la racine se deduit de git, donc appeler le script depuis un
-# sous-projet audite le PARENT et pas le sous-projet. Silencieux et couteux.
-if [ "$RACINE_DEDUITE" -eq 1 ] && [ "$APPEL" != "$ROOT" ]; then
-  alerte "appele depuis ${APPEL#"$ROOT"/}, mais c'est $ROOT qui est audite. La racine est deduite de git. Pour auditer le sous-projet : ctx-audit.sh --root ${APPEL#"$ROOT"/}"
+# Without --root, the root is inferred from git, so calling the script from a subproject
+# audits the PARENT and not the subproject. Silent and costly.
+if [ "$ROOT_INFERRED" -eq 1 ] && [ "$CALL_DIR" != "$ROOT" ]; then
+  warn "called from ${CALL_DIR#"$ROOT"/}, but $ROOT is what gets audited. The root is inferred from git. To audit the subproject: ctx-audit.sh --root ${CALL_DIR#"$ROOT"/}"
 fi
 
-# Le contexte hors git. Un .md ignore par git (notes locales, context-input/, CLAUDE.local.md)
-# reste du contexte, l'audit le lit comme le reste. Mais il ne voyage ni vers un collegue ni
-# vers une autre machine : une information, jamais une alerte. Ce qui est sous un dossier
-# elague (node_modules, un Library/ de moteur, `ignorer:`) ne compte pas. Un seul awk filtre
-# la liste de git contre les motifs d'elagage, sans un sous-processus par chemin.
+# Context outside git. A .md ignored by git (local notes, context-input/, CLAUDE.local.md)
+# is still context, the audit reads it like the rest. But it travels neither to a colleague
+# nor to another machine: an info, never a warning. What lives under a pruned folder
+# (node_modules, an engine Library/, `ignorer:`) does not count. A single awk filters the
+# git list against the pruning patterns, without a subprocess per path.
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  HG="$(git -c core.quotepath=off ls-files -o -i --exclude-standard -- '*.md' 2>/dev/null | LC_ALL=C awk -v ex="$EXCLUS" '
+  GIT_IGNORED="$(git -c core.quotepath=off ls-files -o -i --exclude-standard -- '*.md' 2>/dev/null | LC_ALL=C awk -v ex="$EXCLUDED" '
     BEGIN {
-      n = split(ex, mots, " ")
+      n = split(ex, words, " ")
       for (i = 1; i <= n; i++) {
-        if (mots[i] == "-not" || mots[i] == "-path") continue
-        p = mots[i]
+        if (words[i] == "-not" || words[i] == "-path") continue
+        p = words[i]
         gsub(/[][\\.+?(){}|^$]/, "\\\\&", p)
         gsub(/\*/, ".*", p)
-        motifs[++k] = "^" p "$"
+        patterns[++k] = "^" p "$"
       }
     }
     {
-      q = "./" $0; sauter = 0
-      for (i = 1; i <= k; i++) if (q ~ motifs[i]) { sauter = 1; break }
-      if (sauter) next
+      q = "./" $0; skip = 0
+      for (i = 1; i <= k; i++) if (q ~ patterns[i]) { skip = 1; break }
+      if (skip) next
       nb++
       if (nb <= 3) ex3 = ex3 (nb > 1 ? ", " : "") $0
     }
     END { if (nb > 0) printf "%d\t%s\n", nb, ex3 }' || true)"
-  if [ -n "$HG" ]; then
-    info "${HG%%"$TAB"*} fichier(s) .md de contexte ignores par git : ils ne voyagent ni vers un collegue ni vers une autre machine (exemples : ${HG#*"$TAB"})"
+  if [ -n "$GIT_IGNORED" ]; then
+    info "${GIT_IGNORED%%"$TAB"*} context .md file(s) ignored by git: they travel neither to a colleague nor to another machine (examples: ${GIT_IGNORED#*"$TAB"})"
   fi
 fi
 
-# --- 1b. niveaux imbriques et zones -------------------------------------------
-# Un monorepo porte plusieurs kits, chacun est un niveau autonome a cloturer a
-# part. Une zone ne porte qu'une carte, l'etat et le journal restent a la racine.
-# Dans les deux cas le parent pointe, il n'absorbe pas.
+# --- 1b. nested levels and zones ----------------------------------------------
+# A monorepo carries several kits, each one a standalone level to debrief separately. A
+# zone only carries a map, state and log stay at the root. In both cases the parent points,
+# it does not absorb.
 echo
-echo "1b. Niveaux imbriques et zones"
+echo "1b. Nested levels and zones"
 SEC=1b
-if [ -n "$NIVEAUX" ]; then
-  for n in $NIVEAUX; do
-    alerte "$n porte son propre kit, c'est un niveau a auditer et a cloturer a part : ctx-audit.sh --root $n"
+if [ -n "$LEVELS" ]; then
+  for n in $LEVELS; do
+    warn "$n carries its own kit, it is a level to audit and debrief separately: ctx-audit.sh --root $n"
     grep -q "$n" CODEMAP.md 2>/dev/null \
-      || alerte "$n n'est cite nulle part dans le CODEMAP de la racine, le parent doit pointer vers lui"
+      || warn "$n is not cited anywhere in the root CODEMAP, the parent must point to it"
   done
 else
-  ok "aucun kit imbrique, un seul niveau a tenir"
+  ok "no nested kit, a single level to maintain"
 fi
 if [ -n "$ZONES" ]; then
   for z in $ZONES; do
-    info "zone : $z ($(lignes "$z/CODEMAP.md") lignes de carte$([ -f "$z/CLAUDE.md" ] && printf ', CLAUDE.md de %s lignes' "$(lignes "$z/CLAUDE.md")"))"
+    info "zone: $z ($(count_lines "$z/CODEMAP.md") map lines$([ -f "$z/CLAUDE.md" ] && printf ', CLAUDE.md of %s lines' "$(count_lines "$z/CLAUDE.md")"))"
     grep -q "$z" CODEMAP.md 2>/dev/null \
-      || alerte "la zone $z n'est pas citee dans le CODEMAP de la racine, il doit pointer vers elle"
+      || warn "zone $z is not cited in the root CODEMAP, it must point to it"
   done
 else
-  info "aucune zone, le CODEMAP de la racine porte toute la carte"
+  info "no zone, the root CODEMAP carries the whole map"
 fi
-# Un CLAUDE.md de sous-repertoire sans carte a cote : il se charge quand on touche
-# un fichier du sous-arbre, mais rien ne dit ou est la carte de cette zone.
-for c in $(trouver . -name CLAUDE.md -path './*/*' -not -path './.claude/*' | sort); do
+# A subdirectory CLAUDE.md without a map beside it: it loads when a file of the subtree is
+# touched, but nothing says where the map of this zone is.
+for c in $(find_pruned . -name CLAUDE.md -path './*/*' -not -path './.claude/*' | sort); do
   d="${c%/CLAUDE.md}"; d="${d#./}"
-  [ -f "$d/CODEMAP.md" ] || info "$d porte un CLAUDE.md sans CODEMAP.md, une zone sans carte"
+  [ -f "$d/CODEMAP.md" ] || info "$d carries a CLAUDE.md without a CODEMAP.md, a zone without a map"
 done
 
-# --- 2. fraicheur -------------------------------------------------------------
+# --- 2. freshness -------------------------------------------------------------
 echo
-echo "2. Fraicheur"
+echo "2. Freshness"
 SEC=2
-# Le format du journal vient du bloc, sinon de ce que le CHANGELOG contient. La date
-# de la derniere entree se lit avec le motif de ce format, hors blocs de code.
-CL_FORMAT="$(journal_detecter CHANGELOG.md)"
+# The log format comes from the block, otherwise from what the CHANGELOG contains. The
+# date of the last entry is read with the pattern of that format, outside code blocks.
+CL_FORMAT="$(log_detect CHANGELOG.md)"
 CL_DATE=""
 if [ -f CHANGELOG.md ] && [ -n "$CL_FORMAT" ]; then
   CL_DATE="$(awk '/^[ \t]*```/{c=!c; next} !c' CHANGELOG.md \
-             | grep -E "$(journal_motif "$CL_FORMAT")" | sed -n '1p' \
+             | grep -E "$(log_pattern "$CL_FORMAT")" | sed -n '1p' \
              | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sed -n '1p' || true)"
-  if [ -n "$(conv_journal_format)" ]; then
-    info "journal CHANGELOG.md : format $CL_FORMAT, declare par le bloc"
+  if [ -n "$(conv_log_format)" ]; then
+    info "log CHANGELOG.md: format $CL_FORMAT, declared by the block"
   else
-    info "journal CHANGELOG.md : format $CL_FORMAT, trouve dans le fichier"
+    info "log CHANGELOG.md: format $CL_FORMAT, found in the file"
   fi
 fi
 if [ -n "$CL_DATE" ]; then
-  jours_depuis "$CL_DATE"; d="$JOURS"
+  days_since "$CL_DATE"; d="$DAYS"
   if [ -n "$d" ] && [ "$d" -gt 30 ]; then
-    alerte "derniere entree CHANGELOG le $CL_DATE, soit $d jours"
+    warn "last CHANGELOG entry on $CL_DATE, that is $d days"
   else
-    ok "derniere entree CHANGELOG le $CL_DATE"
+    ok "last CHANGELOG entry on $CL_DATE"
   fi
 else
-  alerte "aucune entree datee dans CHANGELOG.md (formats reconnus : ## AAAA-MM-JJ, ## [x] - AAAA-MM-JJ, [AAAA-MM-JJ] [TYPE])"
+  warn "no dated entry in CHANGELOG.md (recognized formats: ## YYYY-MM-DD, ## [x] - YYYY-MM-DD, [YYYY-MM-DD] [TYPE])"
 fi
 
-# La date de la carte : sa ligne de mise a jour, hors du bloc contexte:convention (une date
-# de chemin dans `exceptions:` n'est pas la sienne). Sans cette ligne, la premiere date hors
-# du bloc. Une ligne de piege datee plus haut ne passe devant que dans ce repli.
+# The map date: its update line, outside the contexte:convention block (a path date in
+# `exceptions:` is not its own). Without that line, the first date outside the block. A
+# dated pitfall line only comes first in that fallback.
 CM_DATE=""
 if [ -f CODEMAP.md ]; then
-  CM_HORS_BLOC="$(awk '/<!-- contexte:convention/{b=1} !b{print} b && /-->/{b=0}' CODEMAP.md)"
-  CM_DATE="$(printf '%s\n' "$CM_HORS_BLOC" \
+  CM_OUTSIDE_BLOCK="$(awk '/<!-- contexte:convention/{b=1} !b{print} b && /-->/{b=0}' CODEMAP.md)"
+  CM_DATE="$(printf '%s\n' "$CM_OUTSIDE_BLOCK" \
              | grep -iE '(mise +[^ ]+ +jour|last +updated)' \
              | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sed -n '1p' || true)"
-  [ -n "$CM_DATE" ] || CM_DATE="$(printf '%s\n' "$CM_HORS_BLOC" \
+  [ -n "$CM_DATE" ] || CM_DATE="$(printf '%s\n' "$CM_OUTSIDE_BLOCK" \
              | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sed -n '1p' || true)"
 fi
-[ -n "$CM_DATE" ] && info "CODEMAP date du $CM_DATE" || alerte "CODEMAP.md sans date de mise a jour"
+[ -n "$CM_DATE" ] && info "CODEMAP dated $CM_DATE" || warn "CODEMAP.md without an update date"
 
 if [ -f TODOS.md ]; then
-  if grep -qiE "$RE_REPRISE" TODOS.md; then
-    # La date du bloc, du titre qui contient « reprise » au titre suivant : une date de tete
-    # de fichier ou d'une section plus haute n'est pas celle de l'etat.
-    TD_DATE="$(awk -v re="$RE_BLOC" '/^## /{ if (dans) exit; if (tolower($0) ~ re) dans=1 } dans{print}' TODOS.md \
+  if grep -qiE "$RE_RESUME" TODOS.md; then
+    # The block date, from the heading that contains "resume" to the next heading: a date at
+    # the top of the file or of a higher section is not the state's.
+    TD_DATE="$(awk -v re="$RE_BLOCK" '/^## /{ if (inside) exit; if (tolower($0) ~ re) inside=1 } inside{print}' TODOS.md \
                | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sed -n '1p' || true)"
-    jours_depuis "${TD_DATE:-}"; d="$JOURS"
+    days_since "${TD_DATE:-}"; d="$DAYS"
     if [ -n "$d" ] && [ "$d" -gt 14 ]; then
-      alerte "bloc Etat a la reprise date du $TD_DATE, soit $d jours"
+      warn "Resume state block dated $TD_DATE, that is $d days"
     else
-      ok "bloc Etat a la reprise present (${TD_DATE:-sans date})"
+      ok "Resume state block present (${TD_DATE:-no date})"
     fi
   else
-    alerte "TODOS.md n'a pas de bloc '$LIB_REPRISE', un redemarrage a froid perdrait le fil"
+    warn "TODOS.md has no '$RESUME_LABEL' block, a cold restart would lose the thread"
   fi
 fi
 
-# --- 3. perimetre modifie -----------------------------------------------------
+# --- 3. modified scope --------------------------------------------------------
 echo
-echo "3. Perimetre modifie depuis la derniere entree CHANGELOG"
+echo "3. Scope changed since the last CHANGELOG entry"
 SEC=3
-MODIFS="$( { git status --porcelain -uall 2>/dev/null | sed 's/^...//' ;
+CHANGED="$( { git status --porcelain -uall 2>/dev/null | sed 's/^...//' ;
              if [ -n "$CL_DATE" ]; then
-               # L'heure explicite : une date seule est completee par l'heure courante,
-               # et la liste des fichiers touches varierait a la seconde.
+               # Explicit time: a bare date is completed with the current time,
+               # and the list of touched files would vary by the second.
                git log --since="${CL_DATE}T00:00:00" --name-only --pretty=format: 2>/dev/null
              else
                git log -20 --name-only --pretty=format: 2>/dev/null
              fi ; } | grep -v '^$' | sort -u || true)"
-NB_MODIFS="$(printf '%s\n' "$MODIFS" | grep -c . || true)"
-if [ "${NB_MODIFS:-0}" -eq 0 ]; then
-  ok "rien de modifie"
+NB_CHANGED="$(printf '%s\n' "$CHANGED" | grep -c . || true)"
+if [ "${NB_CHANGED:-0}" -eq 0 ]; then
+  ok "nothing changed"
 else
-  info "$NB_MODIFS fichier(s) touche(s)"
-  head -15 <<<"$MODIFS" | sed 's/^/       /'
-  [ "$NB_MODIFS" -gt 15 ] && printf '       ... et %s de plus\n' "$((NB_MODIFS - 15))"
+  info "$NB_CHANGED file(s) touched"
+  head -15 <<<"$CHANGED" | sed 's/^/       /'
+  [ "$NB_CHANGED" -gt 15 ] && printf '       ... and %s more\n' "$((NB_CHANGED - 15))"
 fi
 
-# --- 4. etat des fiches docs/ -------------------------------------------------
+# --- 4. state of the docs/ pages ----------------------------------------------
 echo
-echo "4. Fiches $DOCS_DIR/"
+echo "4. Pages $DOCS_DIR/"
 SEC=4
 if [ -n "$DOCS_DIR" ] && [ -d "$DOCS_DIR" ]; then
-  NB_FICHES=0
-  INDEX_DOCS="$DOCS_DIR/README.md"
-  ATTEINTES=""
+  NB_PAGES=0
+  DOCS_INDEX="$DOCS_DIR/README.md"
+  REACHED=""
   INDEX_TXT=""
-  if [ -f "$INDEX_DOCS" ]; then
-    ATTEINTES="$(fiches_atteintes "$INDEX_DOCS")"
-    INDEX_TXT="$(cat "$INDEX_DOCS")"
+  if [ -f "$DOCS_INDEX" ]; then
+    REACHED="$(pages_reached "$DOCS_INDEX")"
+    INDEX_TXT="$(cat "$DOCS_INDEX")"
   fi
-  # Le awk ne rend rien pour une fiche vide : elle se traite apres, comme un en-tete absent.
-  LISTE_FICHES="$(find "$DOCS_DIR" -name '*.md' -not -name 'README.md' 2>/dev/null | sort)"
-  VIDES="$(find "$DOCS_DIR" -name '*.md' -not -name 'README.md' -empty 2>/dev/null | sort)"
-  while IFS="$US" read -r f entete vdate portee; do
+  # The awk returns nothing for an empty page: it is handled afterwards, like a missing header.
+  PAGE_LIST="$(find "$DOCS_DIR" -name '*.md' -not -name 'README.md' 2>/dev/null | sort)"
+  EMPTY_PAGES="$(find "$DOCS_DIR" -name '*.md' -not -name 'README.md' -empty 2>/dev/null | sort)"
+  while IFS="$US" read -r f header vdate scope; do
     [ -n "$f" ] || continue
-    NB_FICHES=$((NB_FICHES + 1))
-    # Un jugement deja rendu, ecrit dans `exceptions: fiche=<chemin>`
-    if [ -n "$EXCEPTIONS" ] && exception_de fiche "$f"; then continue; fi
-    if [ -z "$entete" ]; then
-      alerte "$f : pas d'en-tete de statut"
+    NB_PAGES=$((NB_PAGES + 1))
+    # A judgment already made, written in `exceptions: fiche=<path>`
+    if [ -n "$EXCEPTIONS" ] && exception_of fiche "$f"; then continue; fi
+    if [ -z "$header" ]; then
+      warn "$f: no status header"
       continue
     fi
-    case "$entete" in
-      *"🔴"*) alerte "$f : marquee obsolete, a deplacer vers archives/ maintenant" ;;
-      *"🟡"*) alerte "$f : marquee a verifier" ;;
+    case "$header" in
+      *"🔴"*) warn "$f: marked obsolete, move to archives/ now" ;;
+      *"🟡"*) warn "$f: marked to verify" ;;
     esac
     if [ -z "$vdate" ]; then
-      alerte "$f : en-tete sans date de verification"
+      warn "$f: header without a verification date"
     else
-      jours_depuis "$vdate"; d="$JOURS"
-      if [ -n "$d" ] && [ "$d" -gt "$PEREMPTION" ]; then
-        alerte "$f : verifiee il y a $d jours (seuil $PEREMPTION)"
+      days_since "$vdate"; d="$DAYS"
+      if [ -n "$d" ] && [ "$d" -gt "$STALENESS" ]; then
+        warn "$f: verified $d days ago (threshold $STALENESS)"
       fi
     fi
-    # la portee recoupe-t-elle un fichier modifie ? Une fiche verifiee aujourd'hui
-    # a deja ete relue, la signaler ferait du bruit a chaque cloture. Et un ADR ne
-    # se redate jamais, il se supersede, donc sa portee n'a pas a etre surveillee.
-    case "$f" in *fecisions/*|*decisions/*|*/adr/*) portee="" ;; esac
-    if [ -n "$portee" ] && [ "${NB_MODIFS:-0}" -gt 0 ] && [ "${vdate:-}" != "$TODAY" ]; then
+    # does the scope overlap a modified file? A page verified today has already been
+    # reread, reporting it would make noise at every debrief. And an ADR is never redated,
+    # it is superseded, so its scope does not need watching.
+    case "$f" in *fecisions/*|*decisions/*|*/adr/*) scope="" ;; esac
+    if [ -n "$scope" ] && [ "${NB_CHANGED:-0}" -gt 0 ] && [ "${vdate:-}" != "$TODAY" ]; then
       while IFS= read -r p; do
-        prefixe="${p%%\**}"
-        prefixe="${prefixe%/}"
-        [ -n "$prefixe" ] || continue
-        if grep -q "^$prefixe" <<<"$MODIFS"; then
-          alerte "$f : sa portee ($p) a bouge, relire la fiche"
+        prefix="${p%%\**}"
+        prefix="${prefix%/}"
+        [ -n "$prefix" ] || continue
+        if grep -q "^$prefix" <<<"$CHANGED"; then
+          warn "$f: its scope ($p) has moved, reread the page"
           break
         fi
-      done <<FIN2
-$(printf '%s' "$portee" | grep -oE '`[^`]+`' | tr -d '`' || true)
-FIN2
+      done <<EOT2
+$(printf '%s' "$scope" | grep -oE '`[^`]+`' | tr -d '`' || true)
+EOT2
     fi
-    # indexee ? Citee dans l'index par son nom, ou atteinte depuis lui par des liens,
-    # trois sauts au plus (index racine, sous-index de zone, fiche).
+    # indexed? Cited in the index by name, or reached from it by links, three hops at most
+    # (root index, zone sub-index, page).
     base="${f##*/}"
-    if [ -f "$INDEX_DOCS" ]; then
+    if [ -f "$DOCS_INDEX" ]; then
       case "$INDEX_TXT" in *"$base"*) ;; *)
-        case "$NL$ATTEINTES$NL" in *"$NL$f$NL"*) ;; *)
-          alerte "$f : absente de l'index $INDEX_DOCS" ;;
+        case "$NL$REACHED$NL" in *"$NL$f$NL"*) ;; *)
+          warn "$f: missing from the index $DOCS_INDEX" ;;
         esac ;;
       esac
     fi
-  done <<FIN
-$(printf '%s\n' "$LISTE_FICHES" | entetes_fiches)
-FIN
+  done <<EOT
+$(printf '%s\n' "$PAGE_LIST" | page_headers)
+EOT
   while IFS= read -r f; do
     [ -n "$f" ] || continue
-    NB_FICHES=$((NB_FICHES + 1))
-    if [ -n "$EXCEPTIONS" ] && exception_de fiche "$f"; then continue; fi
-    alerte "$f : pas d'en-tete de statut"
-  done <<FIN
-$VIDES
-FIN
-  [ "$NB_FICHES" -eq 0 ] && info "aucune fiche pour l'instant" \
-                         || info "$NB_FICHES fiche(s) examinee(s)"
+    NB_PAGES=$((NB_PAGES + 1))
+    if [ -n "$EXCEPTIONS" ] && exception_of fiche "$f"; then continue; fi
+    warn "$f: no status header"
+  done <<EOT
+$EMPTY_PAGES
+EOT
+  [ "$NB_PAGES" -eq 0 ] && info "no page yet" \
+                        || info "$NB_PAGES page(s) examined"
 fi
 
-# --- 5. modules sans fiche ----------------------------------------------------
+# --- 5. modules without a page ------------------------------------------------
 echo
-echo "5. Modules sans fiche"
+echo "5. Modules without a page"
 SEC=5
 SRC=""
 for d in src lib app packages apps internal cmd services; do [ -d "$d" ] && SRC="$SRC $d"; done
 if [ -n "$SRC" ]; then
-  trouve=0
+  found=0
   for base in $SRC; do
     for m in $(find "$base" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort); do
-      nom="$(basename "$m")"
-      case "$nom" in .*|__pycache__|node_modules|test|tests) continue ;; esac
-      # Un sous-projet qui porte son propre kit n'est pas un module du parent. Lui
-      # reclamer une fiche ici pousserait a dupliquer sa doc, ce que la convention
-      # interdit. Il est signale en section 1b comme niveau a part. Une zone qui
-      # porte sa carte est deja documentee par elle.
+      name="$(basename "$m")"
+      case "$name" in .*|__pycache__|node_modules|test|tests) continue ;; esac
+      # A subproject that carries its own kit is not a module of the parent. Asking it for
+      # a page here would push to duplicate its docs, which the convention forbids. It is
+      # reported in section 1b as a separate level. A zone that carries its map is already
+      # documented by it.
       [ -f "$m/CODEMAP.md" ] && continue
-      if [ ! -f "${DOCS_DIR:-docs}/modules/$nom.md" ]; then
-        info "$m : pas de fiche ${DOCS_DIR:-docs}/modules/$nom.md"
-        trouve=$((trouve + 1))
+      if [ ! -f "${DOCS_DIR:-docs}/modules/$name.md" ]; then
+        info "$m: no page ${DOCS_DIR:-docs}/modules/$name.md"
+        found=$((found + 1))
       fi
     done
   done
-  [ "$trouve" -eq 0 ] && ok "chaque module de premier niveau a sa fiche ou sa carte de zone"
-  [ "$trouve" -gt 0 ] && info "toutes ne meritent pas une fiche, voir references/DOCS-SYSTEM.md"
+  [ "$found" -eq 0 ] && ok "each top-level module has its page or its zone map"
+  [ "$found" -gt 0 ] && info "not all deserve a page, see references/DOCS-SYSTEM.md"
 else
-  info "pas de repertoire source standard detecte"
+  info "no standard source directory detected"
 fi
 
-# --- 6. liens relatifs morts --------------------------------------------------
+# --- 6. dead relative links ---------------------------------------------------
 echo
-echo "6. Liens morts"
+echo "6. Dead links"
 SEC=6
-morts=0
-# Les blocs de code, les commentaires HTML, les spans de code et le code indente sont retires
-# avant de chercher les liens : ce qu'ils montrent est un exemple, pas un lien de la doc.
-while IFS="$US" read -r f lien; do
-  [ -n "$lien" ] || continue
+dead=0
+# Code blocks, HTML comments, code spans and indented code are removed before looking for
+# links: what they show is an example, not a docs link.
+while IFS="$US" read -r f link; do
+  [ -n "$link" ] || continue
   case "$f" in */*) dir="${f%/*}" ;; *) dir=. ;; esac
-  # on ignore l'externe et les emplacements a remplir des gabarits
-  if lien_externe "$lien"; then continue; fi
-  cible_du_lien "$lien"; cible="$CIBLE"
-  [ -n "$cible" ] || continue
-  case "$cible" in URL|url|LIEN|lien|link|chemin|path) continue ;; esac
-  normaliser "$dir/$cible"
+  # skip external links and template placeholders
+  if external_link "$link"; then continue; fi
+  link_target "$link"; target="$TARGET"
+  [ -n "$target" ] || continue
+  case "$target" in URL|url|LIEN|lien|link|chemin|path) continue ;; esac
+  normalize "$dir/$target"
   norm="$NORM"
-  # Un jugement deja rendu, ecrit dans `exceptions: lien=<chemin>`. Il couvre la cible
-  # telle qu'elle est ecrite, la cible depuis la racine, ou la page qui porte le lien.
+  # A judgment already made, written in `exceptions: lien=<path>`. It covers the target as
+  # written, the target from the root, or the page that carries the link.
   if [ -n "$EXCEPTIONS" ]; then
-    if exception_de lien "$cible" || exception_de lien "$norm" || exception_de lien "$f"; then continue; fi
+    if exception_of lien "$target" || exception_of lien "$norm" || exception_of lien "$f"; then continue; fi
   fi
-  if [ ! -e "$dir/$cible" ] && [ ! -e "$cible" ]; then
-    if sous_module_vide "$norm"; then continue; fi
-    alerte "$f : lien mort vers $cible"
-    morts=$((morts + 1))
+  if [ ! -e "$dir/$target" ] && [ ! -e "$target" ]; then
+    if empty_submodule "$norm"; then continue; fi
+    warn "$f: dead link to $target"
+    dead=$((dead + 1))
   else
-    # Un lien qui resout DANS les archives est un defaut d'un autre genre : le
-    # lien marche, et il envoie le lecteur vers du faux ou du froid. La
-    # convention l'interdit, et rien ne le voyait.
+    # A link that resolves INTO the archives is a defect of another kind: the link works,
+    # and it sends the reader to false or cold content. The convention forbids it, and
+    # nothing saw it.
     if [ -n "$ARCH_DIR" ]; then
       case "$norm" in
         "$ARCH_DIR"/*|*/"$ARCH_DIR"/*)
-          alerte "$f : lie vers l'archive $cible. Une fiche vivante ne cite pas une archive, retirer le lien ou le reformuler en prose"
-          morts=$((morts + 1)) ;;
+          warn "$f: links to the archive $target. A living page does not cite an archive, remove the link or reword it as prose"
+          dead=$((dead + 1)) ;;
       esac
     fi
   fi
-done <<FIN
-$(docs_md | liens_tous)
-FIN
-[ "$morts" -eq 0 ] && ok "aucun lien relatif casse"
+done <<EOT
+$(docs_md | links_all)
+EOT
+[ "$dead" -eq 0 ] && ok "no broken relative link"
 
-# --- 7. coherence des archives ------------------------------------------------
-# Quatre defauts eprouves sur un depot d'essai, aucun n'etait vu avant :
-# l'index cherche par nom de base, un remplacant qui ne resout plus, un archive
-# recree en vivant au meme chemin, et l'index lui-meme jamais mesure ni relu.
+# --- 7. archive consistency ---------------------------------------------------
+# Four defects proven on a test repo, none was seen before: the index searched by base
+# name, a replacement that no longer resolves, an archive recreated as a living file at the
+# same path, and the index itself never measured or reread.
 echo
 echo "7. Archives"
 SEC=7
 if [ -n "$ARCH_DIR" ] && [ -d "$ARCH_DIR" ]; then
   nb=0
-  # Un seul awk lit l'en-tete de toutes les archives, la boucle ne lance plus rien par
-  # fichier : sur 250 archives, une douzaine de head et de grep chacune coutaient 2,7 s.
-  # Un enregistrement par fichier, champs separes par US : le chemin, l'en-tete ARCHIVE
-  # present dans les 6 premieres lignes, les chemins en backticks de la ligne « Remplace
-  # par » puis de la ligne « Origine » (separes par RS_), une rotation ou un jugement dit
-  # en prose dans les 8 premieres lignes, le nombre de lignes lues. L'index se lit une
-  # fois : un chemin n'a pas de saut de ligne, chercher dans le texte vaut chercher
-  # ligne a ligne.
+  # A single awk reads the header of all archives, the loop no longer launches anything per
+  # file: on 250 archives, a dozen head and grep each cost 2.7 s. One record per file,
+  # fields separated by US: the path, the ARCHIVE header present in the first 6 lines, the
+  # backtick paths of the "Replaced by" line then of the "Origin" line (separated by RS_), a
+  # rotation or a judgment said in prose in the first 8 lines, the number of lines read. The
+  # index is read once: a path has no newline, searching the text is searching line by line.
   ARCH_INDEX=""
   if [ -f "$ARCH_DIR/README.md" ]; then ARCH_INDEX="$(cat "$ARCH_DIR/README.md")"; fi
-  ARCH_ENR="$(find "$ARCH_DIR" -name '*.md' -not -name 'README.md' 2>/dev/null | sort | awk -v remp="$RE_REMPL" -v orig="$RE_ORIGINE" '
-    function jetons(s,   t, r) {
+  ARCH_REC="$(find "$ARCH_DIR" -name '*.md' -not -name 'README.md' 2>/dev/null | sort | awk -v remp="$RE_REPLACED" -v orig="$RE_ORIGIN" '
+    function tokens(s,   t, r) {
       r = ""
       while (match(s, /`[^`]+`/)) {
         t = substr(s, RSTART + 1, RLENGTH - 2)
@@ -1265,353 +1253,352 @@ if [ -n "$ARCH_DIR" ] && [ -d "$ARCH_DIR" ]; then
         if (n <= 6 && (index(l, "ARCHIV") > 0 || tolower(l) ~ /^[[:space:]]*>.*archiv/)) e6 = 1
         if (!vrem && l ~ remp) { vrem = 1; rem = l }
         if (!vori && l ~ orig) { vori = 1; ori = l }
-        if (l !~ orig && l !~ remp && tolower(l) ~ /rotation|jugement|volontaire|deliber|intentionn/) rot = 1
+        if (l !~ orig && l !~ remp && tolower(l) ~ /rotation|jugement|volontaire|deliber|intentionn|judg(e)?ment|on purpose/) rot = 1
       }
       close(f)
-      printf "%s\037%d\037%s\037%s\037%d\037%d\n", f, e6, jetons(rem), jetons(ori), rot, n
+      printf "%s\037%d\037%s\037%s\037%d\037%d\n", f, e6, tokens(rem), tokens(ori), rot, n
     }')"
-  while IFS="$US" read -r f e6 cibles origines rotation nlu; do
+  while IFS="$US" read -r f e6 targets origins rotation nread; do
     [ -n "$f" ] || continue
     nb=$((nb + 1))
-    # Un jugement deja rendu, ecrit dans `exceptions: archive=<chemin>`
-    if [ -n "$EXCEPTIONS" ] && exception_de archive "$f"; then continue; fi
-    # L'en-tete s'ecrit en capitales ou non : une citation en tete qui parle
-    # d'archive suffit. Un mot « archive » dans le texte ne compte pas.
+    # A judgment already made, written in `exceptions: archive=<path>`
+    if [ -n "$EXCEPTIONS" ] && exception_of archive "$f"; then continue; fi
+    # The header is written in capitals or not: a quote at the top that talks about
+    # archive is enough. An "archive" word in the text does not count.
     if [ "$e6" -eq 0 ]; then
-      alerte "$f : pas d'en-tete ARCHIVE"
+      warn "$f: no ARCHIVE header"
     fi
-    # Index cherche par CHEMIN COMPLET. Par nom de base, un nom present dans la
-    # colonne « Remplace par » d'une autre ligne suffisait a passer.
+    # Index searched by FULL PATH. By base name, a name present in the "Replaced by" column
+    # of another line was enough to pass.
     if [ -f "$ARCH_DIR/README.md" ]; then
-      case "$ARCH_INDEX" in *"$f"*) ;; *) alerte "$f : absent de l'index $ARCH_DIR/README.md" ;; esac
+      case "$ARCH_INDEX" in *"$f"*) ;; *) warn "$f: missing from the index $ARCH_DIR/README.md" ;; esac
     fi
-    # Le remplacant resout-il encore ? C'est le champ qui fait la valeur de
-    # l'en-tete, et il pourrit sans bruit.
-    if [ -n "$cibles" ]; then
-      while IFS= read -r cible; do
-        case "$cible" in *' '*|*aucun*|*'<'*|*'{{'*|'') continue ;; esac
-        # Un chemin porte un / et ne finit pas par un /. « SKILL.md » ou
-        # « references/ » nomment une partie d'un paquet, pas un fichier du depot.
-        case "$cible" in */) continue ;; esac
-        case "$cible" in */*) : ;; *) continue ;; esac
-        [ -e "$cible" ] || alerte "$f : son remplacant $cible n'existe plus"
-      done <<FIN3
-${cibles//$RS_/$NL}
-FIN3
+    # Does the replacement still resolve? It is the field that gives the header its value,
+    # and it rots silently.
+    if [ -n "$targets" ]; then
+      while IFS= read -r target; do
+        case "$target" in *' '*|*aucun*|*none*|*'<'*|*'{{'*|'') continue ;; esac
+        # A path carries a / and does not end with a /. "SKILL.md" or "references/" name a
+        # part of a package, not a repo file.
+        case "$target" in */) continue ;; esac
+        case "$target" in */*) : ;; *) continue ;; esac
+        [ -e "$target" ] || warn "$f: its replacement $target no longer exists"
+      done <<EOT3
+${targets//$RS_/$NL}
+EOT3
     fi
-    # Un vivant au meme chemin que l'origine : deux verites en face, dont une
-    # marquee fausse.
-    orig="${origines//$RS_/$NL}"
-    # Une rotation ou un jugement ecrit en prose dans l'en-tete (recreation voulue) :
-    # la coexistence est deja tranchee, l'alerte reviendrait a chaque audit sans rien dire.
-    # Les lignes `Origine :` et `Remplace par :` ne comptent pas : elles portent des chemins,
-    # et `docs/modules/rotation.md` n'est pas un jugement.
-    # Un resume pose par ctx-rotation.sh --plans (via ctx-archive.sh --resume) porte le
-    # marqueur plan-resume : le vivant est le geste prevu, pas une recreation.
-    resume=0
-    if [ -n "$orig" ] && [ -f "$orig" ] && grep -qF 'plan-resume' "$orig"; then resume=1; fi
-    if [ -n "$orig" ] && [ -e "$orig" ] && [ "$rotation" -eq 0 ] && [ "$resume" -eq 0 ]; then
-      alerte "$f : $orig existe aussi en vivant. Un archive recree au meme chemin laisse deux verites en face"
+    # A living file at the same path as the origin: two truths face to face, one of them
+    # marked false.
+    orig="${origins//$RS_/$NL}"
+    # A rotation or a judgment written in prose in the header (deliberate recreation): the
+    # coexistence is already settled, the warning would come back at every audit saying
+    # nothing. The `Origin:` and `Replaced by:` lines do not count: they carry paths, and
+    # `docs/modules/rotation.md` is not a judgment.
+    # A summary placed by ctx-rotation.sh --plans (via ctx-archive.sh --summary) carries the
+    # plan-resume marker: the living file is the expected gesture, not a recreation.
+    summary=0
+    if [ -n "$orig" ] && [ -f "$orig" ] && grep -qF 'plan-resume' "$orig"; then summary=1; fi
+    if [ -n "$orig" ] && [ -e "$orig" ] && [ "$rotation" -eq 0 ] && [ "$summary" -eq 0 ]; then
+      warn "$f: $orig also exists as a living file. An archive recreated at the same path leaves two truths face to face"
     fi
-    # Taille d'un fichier d'archive. Les bots d'archivage de Wikipedia plafonnent
-    # une page a 200 Ko, pour la meme raison : au-dela on ne fouille plus, on subit.
-    # awk compte une derniere ligne sans saut de ligne que wc ne compte pas : wc tranche
-    # des que awk depasse le seuil.
-    if [ "$nlu" -gt 1500 ]; then
-      n="$(lignes "$f")"
-      if [ "$n" -gt 1500 ]; then alerte "$f : $n lignes. Au-dela de 1500 une archive se coupe, par mois ou par sujet"; fi
+    # Size of an archive file. Wikipedia archive bots cap a page at 200 KB, for the same
+    # reason: beyond that nobody digs, they suffer.
+    # awk counts a last line without a newline that wc does not count: wc decides as soon
+    # as awk goes over the threshold.
+    if [ "$nread" -gt 1500 ]; then
+      n="$(count_lines "$f")"
+      if [ "$n" -gt 1500 ]; then warn "$f: $n lines. Beyond 1500 an archive is split, by month or by topic"; fi
     fi
-  done <<FIN
-$ARCH_ENR
-FIN
-  # L'index est le SEUL fichier des archives qu'on lit vraiment, en archeologie.
-  # Il n'etait ni mesure ni relu, et il a porte une affirmation fausse 25 jours.
+  done <<EOT
+$ARCH_REC
+EOT
+  # The index is the ONLY archive file that is really read, in archaeology. It was neither
+  # measured nor reread, and it carried a false claim for 25 days.
   if [ -f "$ARCH_DIR/README.md" ]; then
-    mesure "$ARCH_DIR/README.md" "index $ARCH_DIR/README.md" 250 400
+    measure "$ARCH_DIR/README.md" "index $ARCH_DIR/README.md" 250 400
     while IFS= read -r p; do
-      # Les emplacements a remplir des gabarits ne sont pas des chemins.
+      # Template placeholders are not paths.
       case "$p" in *'<'*|*'{{'*|*'>'*) continue ;; esac
-      case "$p" in "$ARCH_DIR"/*) [ -e "$p" ] || alerte "index des archives : $p n'existe pas" ;; esac
-    done <<FIN
+      case "$p" in "$ARCH_DIR"/*) [ -e "$p" ] || warn "archive index: $p does not exist" ;; esac
+    done <<EOT
 $(grep -oE '`[^`]+`' "$ARCH_DIR/README.md" 2>/dev/null | tr -d '`' | sort -u || true)
-FIN
+EOT
   fi
-  [ "$nb" -eq 0 ] && info "archives vides" || info "$nb element(s) archive(s)"
-  info "pour y chercher quelque chose : ctx-archeo.sh <motif>, jamais un grep nu"
+  [ "$nb" -eq 0 ] && info "archives empty" || info "$nb archived item(s)"
+  info "to look something up there: ctx-archaeology.sh <pattern>, never a bare grep"
 elif [ -z "$ARCH_DIR" ]; then
-  info "le bloc declare archives: aucune, rien a controler ici"
+  info "the block declares archives: aucune, nothing to check here"
 fi
 
-# --- 8. marqueurs laisses dans le code ----------------------------------------
+# --- 8. markers left in the code ----------------------------------------------
 echo
-echo "8. Marqueurs dans le code"
+echo "8. Markers in the code"
 SEC=8
-MARQ="$(grep -rIn --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=archives \
+MARK="$(grep -rIn --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=archives \
         --exclude-dir=.venv --exclude-dir=dist --exclude-dir=build \
         -E '(TODO|FIXME|HACK|XXX)[:( ]' . 2>/dev/null | grep -vc '^$' || true)"
-if [ "${MARQ:-0}" -gt 0 ]; then
-  info "${MARQ} marqueur(s) TODO/FIXME/HACK. Ceux qui comptent doivent etre dans TODOS.md"
+if [ "${MARK:-0}" -gt 0 ]; then
+  info "${MARK} TODO/FIXME/HACK marker(s). The ones that matter must be in TODOS.md"
 else
-  ok "aucun marqueur"
+  ok "no marker"
 fi
 
-# --- 9. secrets, heuristique legere -------------------------------------------
+# --- 9. secrets, light heuristic ----------------------------------------------
 echo
 echo "9. Secrets"
 SEC=9
 SUSPECT="$(git grep -InE '(api[_-]?key|secret|token|password|passwd)[[:space:]]*[:=][[:space:]]*["'"'"'][A-Za-z0-9_/+-]{16,}' \
            -- . 2>/dev/null | grep -v -E '(\.example|\.sample|templates/|references/)' || true)"
-# Deux jugements ne se refont pas a chaque audit : les chemins de `exceptions: secret=<chemin>`,
-# et la valeur de test evidente dans un fichier de test (fixture d'un scanner anti-fuite).
-FILTRE=""
+# Two judgments are not redone at every audit: the paths of `exceptions: secret=<path>`,
+# and the obvious test value in a test file (fixture of a leak scanner).
+FILTERED=""
 if [ -n "$SUSPECT" ]; then
   while IFS= read -r l; do
-    if [ -n "$EXCEPTIONS" ] && exception_de secret "${l%%:*}"; then continue; fi
-    if secret_factice "$l"; then continue; fi
-    FILTRE="$FILTRE$l
+    if [ -n "$EXCEPTIONS" ] && exception_of secret "${l%%:*}"; then continue; fi
+    if fake_secret "$l"; then continue; fi
+    FILTERED="$FILTERED$l
 "
-  done <<FIN
+  done <<EOT
 $SUSPECT
-FIN
+EOT
 fi
-if [ -n "$FILTRE" ]; then
-  PREMIERS="$(printf '%s' "$FILTRE" | sed -n '1,5p' | cut -d: -f1 | sort -u | tr '\n' ',' | sed 's/,$//; s/,/, /g')"
-  alerte "valeurs qui ressemblent a des secrets dans des fichiers trackes : $PREMIERS" "${PREMIERS%%,*}"
-  printf '%s' "$FILTRE" | sed -n '1,5p' | sed 's/^/       /'
+if [ -n "$FILTERED" ]; then
+  FIRST="$(printf '%s' "$FILTERED" | sed -n '1,5p' | cut -d: -f1 | sort -u | tr '\n' ',' | sed 's/,$//; s/,/, /g')"
+  warn "values that look like secrets in tracked files: $FIRST" "${FIRST%%,*}"
+  printf '%s' "$FILTERED" | sed -n '1,5p' | sed 's/^/       /'
 else
-  ok "rien de suspect dans les fichiers trackes"
+  ok "nothing suspect in tracked files"
 fi
 
-fi # fin des sections 1 a 9, sautees par --budget
+fi # end of sections 1 to 9, skipped by --budget
 
-# --- 10. budget de contexte ---------------------------------------------------
-# Une doc vraie mais trop longue pour etre lue est une doc perdue. Chaque surface
-# a une cible, un seuil d'alerte et un seuil de blocage. Les chiffres sont ceux de
-# references/BUDGET.md, ils se changent la-bas et ici en meme temps.
+# --- 10. context budget -------------------------------------------------------
+# Docs that are true but too long to be read are lost docs. Each surface has a target, a
+# warning threshold and a blocker threshold. The numbers are those of references/BUDGET.md,
+# they change there and here at the same time.
 echo
-echo "10. Budget de contexte"
+echo "10. Context budget"
 SEC=10
 
-# taille du projet, en fichiers
-NB_FICHIERS="$(trouver . -type f | wc -l | tr -d ' ')"
-if   [ "$NB_FICHIERS" -lt 150 ]; then TAILLE=petite
-elif [ "$NB_FICHIERS" -le 600 ]; then TAILLE=moyenne
-else TAILLE=grande; fi
-info "taille mesuree : $TAILLE, $NB_FICHIERS fichiers hors dependances"
-# Un elagage se nomme toujours. Au-dela de la liste fixe (node_modules, dist, target...),
-# trois sources peuvent sauter des fichiers : un moteur de jeu reconnu a son marqueur a la
-# racine, un dossier qui porte un CACHEDIR.TAG, la cle `ignorer:` du bloc.
-# Un moteur se reconnait a son marqueur, a la racine ou jusqu'a la profondeur 3 : chaque racine
-# trouvee a sa ligne, avec son dossier.
-EL_CACHE=""; EL_IGN=""; EL_PLAFOND=""
+# project size, in files
+NB_FILES="$(find_pruned . -type f | wc -l | tr -d ' ')"
+if   [ "$NB_FILES" -lt 150 ]; then SIZE=petite
+elif [ "$NB_FILES" -le 600 ]; then SIZE=moyenne
+else SIZE=grande; fi
+info "measured size: $SIZE, $NB_FILES files outside dependencies"
+# A pruning is always named. Beyond the fixed list (node_modules, dist, target...), three
+# sources can skip files: a game engine recognized by its marker at the root, a folder that
+# carries a CACHEDIR.TAG, the block's `ignorer:` key.
+# An engine is recognized by its marker, at the root or down to depth 3: each root found
+# has its line, with its folder.
+PR_CACHE=""; PR_IGN=""; PR_CAP=""
 while IFS= read -r _l; do
   [ -n "$_l" ] || continue
   _c="${_l%%"$TAB"*}"; _d="${_l#*"$TAB"}"; _r="${_d%%"$TAB"*}"; _d="${_d#*"$TAB"}"
   case "$_c" in
     Unity|Unreal|Godot|'Unreal plugin')
-      _m=""; _v="ne comptent"
+      _m=""
       if [ "$_r" = . ]; then
         case "$_c" in
-          Unity)  _m="elagage Unity, reconnu a ProjectSettings/ProjectVersion.txt a la racine" ;;
-          Unreal) _m="elagage Unreal, reconnu a un fichier .uproject a la racine" ;;
-          Godot)  _m="elagage Godot, reconnu a project.godot a la racine"; _v="ne compte" ;;
+          Unity)  _m="Unity pruning, recognized by ProjectSettings/ProjectVersion.txt at the root" ;;
+          Unreal) _m="Unreal pruning, recognized by a .uproject file at the root" ;;
+          Godot)  _m="Godot pruning, recognized by project.godot at the root" ;;
         esac
       else
         case "$_c" in
-          Unity)           _m="elagage Unity ($_r/), reconnu a $_r/ProjectSettings/ProjectVersion.txt" ;;
-          Unreal)          _m="elagage Unreal ($_r/), reconnu a un fichier .uproject dans $_r/" ;;
-          'Unreal plugin') _m="elagage Unreal plugin ($_r/), reconnu a son fichier .uplugin" ;;
-          Godot)           _m="elagage Godot ($_r/), reconnu a $_r/project.godot"; _v="ne compte" ;;
+          Unity)           _m="Unity pruning ($_r/), recognized by $_r/ProjectSettings/ProjectVersion.txt" ;;
+          Unreal)          _m="Unreal pruning ($_r/), recognized by a .uproject file in $_r/" ;;
+          'Unreal plugin') _m="Unreal plugin pruning ($_r/), recognized by its .uplugin file" ;;
+          Godot)           _m="Godot pruning ($_r/), recognized by $_r/project.godot" ;;
         esac
       fi
-      info "$_m : ${_d//, //, }/ $_v ni dans la taille ni dans les controles" ;;
-    CACHEDIR.TAG) EL_CACHE="${_d//, //, }/" ;;
-    ignorer)      _n="$(exclusions_compter_ignorer "$_d")"
-                  EL_IGN="${EL_IGN:+$EL_IGN, }$_d ($_n)"
-                  EL_IGN_N=$(( ${EL_IGN_N:-0} + _n )) ;;
-    plafond)      EL_PLAFOND="$_d" ;;
+      info "$_m: ${_d//, //, }/ count neither in the size nor in the checks" ;;
+    CACHEDIR.TAG) PR_CACHE="${_d//, //, }/" ;;
+    ignorer)      _n="$(exclusions_count_ignored "$_d")"
+                  PR_IGN="${PR_IGN:+$PR_IGN, }$_d ($_n)"
+                  PR_IGN_N=$(( ${PR_IGN_N:-0} + _n )) ;;
+    cap)          PR_CAP="$_d" ;;
   esac
-done <<FIN
-$(exclusions_noms_groupes)
-FIN
-[ -z "$EL_CACHE" ]   || info "elagage par CACHEDIR.TAG, signature verifiee : $EL_CACHE ne comptent ni dans la taille ni dans les controles"
-[ -z "$EL_IGN" ]     || info "la cle ignorer: du bloc fait sauter ${EL_IGN_N:-0} fichier(s) : $EL_IGN"
-[ -z "$EL_PLAFOND" ] || info "$EL_PLAFOND racine(s) de moteur de jeu au-dela du plafond de 20 : leurs dossiers generes ne sont pas elagues"
-# La mesure fait foi. `taille-forcee:` l'impose a la main et les controles suivent alors
-# la valeur forcee. Une ligne `taille:` n'est plus lue depuis la version 5.
-TAILLE_FORCEE="$(conv_lire taille-forcee)"
-case "$TAILLE_FORCEE" in
+done <<EOT
+$(exclusions_names_grouped)
+EOT
+[ -z "$PR_CACHE" ] || info "CACHEDIR.TAG pruning, signature verified: $PR_CACHE count neither in the size nor in the checks"
+[ -z "$PR_IGN" ]   || info "the block's ignorer: key skips ${PR_IGN_N:-0} file(s): $PR_IGN"
+[ -z "$PR_CAP" ]   || info "$PR_CAP game engine root(s) beyond the cap of 20: their generated folders are not pruned"
+# The measure holds. `taille-forcee:` imposes it by hand and the checks then follow the
+# forced value. A `taille:` line is no longer read since version 5.
+FORCED_SIZE="$(conv_read taille-forcee)"
+case "$FORCED_SIZE" in
   '') ;;
   petite|moyenne|grande)
-    if [ "$TAILLE_FORCEE" != "$TAILLE" ]; then
-      info "le bloc force « taille-forcee: $TAILLE_FORCEE », la mesure donne $TAILLE ($NB_FICHIERS fichiers). Les controles suivent la valeur forcee. La retirer si la mesure convient" "$(conv_trouver)"
+    if [ "$FORCED_SIZE" != "$SIZE" ]; then
+      info "the block forces « taille-forcee: $FORCED_SIZE », the measure gives $SIZE ($NB_FILES files). The checks follow the forced value. Remove it if the measure fits" "$(conv_find)"
     fi
-    TAILLE="$TAILLE_FORCEE" ;;
-  *) info "taille-forcee: $TAILLE_FORCEE n'est pas une taille connue (petite, moyenne, grande), la mesure est gardee" ;;
+    SIZE="$FORCED_SIZE" ;;
+  *) info "taille-forcee: $FORCED_SIZE is not a known size (petite, moyenne, grande), the measure is kept" ;;
 esac
-case "$BLOC_V" in ''|*[!0-9]*) ;; *)
-  if [ "$BLOC_V" -ge 5 ] && [ -n "$TAILLE_DECLAREE" ]; then
-    info "la ligne taille: n'est plus lue depuis la version 5, la taille se mesure ($TAILLE). La retirer, ou la passer en taille-forcee:" "$(conv_trouver)"
+case "$BLOCK_V" in ''|*[!0-9]*) ;; *)
+  if [ "$BLOCK_V" -ge 5 ] && [ -n "$DECLARED_SIZE" ]; then
+    info "the taille: line is no longer read since version 5, the size is measured ($SIZE). Remove it, or turn it into taille-forcee:" "$(conv_find)"
   fi ;;
 esac
 
-# CLAUDE.md de la racine : ni etat, ni recit. Un fichier qui porte beaucoup de
-# dates a absorbe de l'histoire, et l'histoire a un autre proprietaire.
-# Un CLAUDE.md reduit a un renvoi ne porte rien lui-meme : on mesure le fichier qui
-# porte les regles, et on ne dit pas « ok » sur un fichier d'une ligne.
-CLAUDE_LU=""
-# Un CLAUDE.md vide est dit en section 1, le mesurer « ok » le contredirait.
+# Root CLAUDE.md: neither state nor story. A file that carries many dates has absorbed
+# history, and history has another owner.
+# A CLAUDE.md reduced to a redirect carries nothing itself: we measure the file that
+# carries the rules, and we do not say "ok" on a one-line file.
+CLAUDE_READ=""
+# An empty CLAUDE.md is reported in section 1, measuring it "ok" would contradict that.
 if [ -f CLAUDE.md ] && grep -q '[^[:space:]]' CLAUDE.md 2>/dev/null; then
-  if [ -z "$CLAUDE_RENVOI" ]; then
-    mesure CLAUDE.md "CLAUDE.md" 150 200 40000
-    CLAUDE_LU=CLAUDE.md
-  elif [ -f "$CLAUDE_RENVOI" ] && grep -q '[^[:space:]]' "$CLAUDE_RENVOI" 2>/dev/null; then
-    mesure "$CLAUDE_RENVOI" "$CLAUDE_RENVOI (porte les regles de CLAUDE.md)" 150 200 40000 CLAUDE.md
-    CLAUDE_LU="$CLAUDE_RENVOI"
+  if [ -z "$CLAUDE_REDIRECT" ]; then
+    measure CLAUDE.md "CLAUDE.md" 150 200 40000
+    CLAUDE_READ=CLAUDE.md
+  elif [ -f "$CLAUDE_REDIRECT" ] && grep -q '[^[:space:]]' "$CLAUDE_REDIRECT" 2>/dev/null; then
+    measure "$CLAUDE_REDIRECT" "$CLAUDE_REDIRECT (carries the rules of CLAUDE.md)" 150 200 40000 CLAUDE.md
+    CLAUDE_READ="$CLAUDE_REDIRECT"
   fi
 fi
-if [ -n "$CLAUDE_LU" ]; then
-  nd="$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' "$CLAUDE_LU" | wc -l | tr -d ' ')"
-  [ "$nd" -gt 8 ] && alerte "CLAUDE.md porte $nd dates, un etat ou un recit s'y est glisse. L'etat va dans TODOS, l'histoire au CHANGELOG"
-  grep -qiE '^\*\*(etat|état)|^#+ .*(etat|état)' "$CLAUDE_LU" \
-    && alerte "CLAUDE.md porte un paragraphe d'etat. Il appartient au bloc de reprise de TODOS.md"
-  # Heuristique prudente, en info : une ligne qui porte une date ET un verbe d'etat ou
-  # de recit. Un fichier de regles dit ce qui est vrai tout le temps, pas ce qui s'est passe.
-  RE_DATE_LIBRE='[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}(er)? (janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre) [0-9]{4}'
-  RE_RECIT='(etat|état|statut|status)[^.]{0,30}( au | le | du | depuis |as of)|en cours|derni(e|è)re (session|cl(o|ô)ture|mise)|livr(e|é)|termin(e|é)|session du|nous avons|on a |j.ai |a (e|é)t(e|é)|reste (a|à) |prochaine (session|etape|étape)'
-  recit="$(md_sans_code "$CLAUDE_LU" | grep -E "$RE_DATE_LIBRE" | grep -iE "$RE_RECIT" || true)"
-  nr="$(printf '%s' "$recit" | grep -c . || true)"
-  if [ "${nr:-0}" -ge 2 ]; then
-    info "CLAUDE.md : $nr ligne(s) portent une date et un verbe d'etat ou de recit, par exemple « $(head -1 <<<"$recit" | cut -c1-70) ». L'etat va dans le bloc de reprise de TODOS, le recit au CHANGELOG" CLAUDE.md
+if [ -n "$CLAUDE_READ" ]; then
+  nd="$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' "$CLAUDE_READ" | wc -l | tr -d ' ')"
+  [ "$nd" -gt 8 ] && warn "CLAUDE.md carries $nd dates, a state or a story has slipped in. State goes in TODOS, history in the CHANGELOG"
+  grep -qiE '^\*\*(etat|état|state|status)|^#+ (.*[^[:alpha:]])?(etat|état|state|status)([^[:alpha:]]|$)' "$CLAUDE_READ" \
+    && warn "CLAUDE.md carries a state paragraph. It belongs in the resume block of TODOS.md"
+  # Careful heuristic, as an info: a line that carries a date AND a state or story verb. A
+  # rules file says what is always true, not what happened.
+  MONTHS_FR='janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre'
+  MONTHS_EN='january|february|march|april|may|june|july|august|september|october|november|december'
+  RE_FREE_DATE="[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}(er|st|nd|rd|th)? ($MONTHS_FR|$MONTHS_EN) [0-9]{4}|($MONTHS_EN) [0-9]{1,2}(st|nd|rd|th)?,? [0-9]{4}"
+  RE_STORY='(etat|état|statut|status|state)[^.]{0,30}( au | le | du | depuis |as of| on | since )|en cours|derni(e|è)re (session|cl(o|ô)ture|mise)|livr(e|é)|termin(e|é)|session du|nous avons|on a |j.ai |a (e|é)t(e|é)|reste (a|à) |prochaine (session|etape|étape)|in progress|last (session|debrief|update)|delivered|finished|completed|session of|we (have|did)|(^|[^[:alpha:]])i (did|have)|has been|remains to|next (session|step)'
+  story="$(md_no_code "$CLAUDE_READ" | grep -iE "$RE_FREE_DATE" | grep -iE "$RE_STORY" || true)"
+  ns_story="$(printf '%s' "$story" | grep -c . || true)"
+  if [ "${ns_story:-0}" -ge 2 ]; then
+    info "CLAUDE.md: $ns_story line(s) carry a date and a state or story verb, for example « $(head -1 <<<"$story" | cut -c1-70) ». State goes in the resume block of TODOS, the story in the CHANGELOG" CLAUDE.md
   fi
 fi
 
-# Consigne de demarrage non bornee : un CLAUDE.md ou un AGENTS.md qui ordonne de lire en
-# entier un fichier plus long que son seuil de blocage. « lis TODOS.md » charge tout le
-# fichier, « lis le bloc de reprise de TODOS.md » n'en charge qu'une partie.
-RE_ORDRE='(^|[^[:alpha:]])(lis|lire|lisez|read|ouvre|ouvrir|ouvrez|consulte|consulter)([^[:alpha:]]|$)'
+# Unbounded startup instruction: a CLAUDE.md or AGENTS.md that orders reading in full a
+# file longer than its blocker threshold. "read TODOS.md" loads the whole file, "read the
+# resume block of TODOS.md" loads only a part.
+RE_ORDER='(^|[^[:alpha:]])(lis|lire|lisez|read|ouvre|ouvrir|ouvrez|consulte|consulter)([^[:alpha:]]|$)'
 RE_NEG="(^|[^[:alpha:]])(ne|n')[^.]{0,25}(pas|jamais|plus)|jamais|sans lire|do not|don't|never|inutile|pas besoin"
-# Une lecture bornee limite la portee : « le bloc de reprise de X », « la section Y de X »,
-# « les 40 premieres lignes », « head -n », « only the resume block », « jusqu'a ... ». Un mot
-# isole ne borne rien : « en premier », « first », « pour la derniere session » ne disent pas
-# quelle partie lire, et le fichier se charge en entier. L'ancre `X.md#titre` borne aussi, elle
-# se teste a part dans consignes_non_bornees.
-# Le debut d'un mot s'ecrit (^|[^[:alpha:]]) : « partir de » ne contient pas « partie ».
+# A bounded read limits the scope: "the resume block of X", "section Y of X", "the first 40
+# lines", "head -n", "only the resume block", "up to ...". A bare word bounds nothing:
+# "first", "for the last session" do not say which part to read, and the file loads in full.
+# The `X.md#title` anchor also bounds, it is tested apart in unbounded_orders.
+# The start of a word is written (^|[^[:alpha:]]): "partir de" does not contain "partie".
 AV='(^|[^[:alpha:]])'
-RE_BORNE="${AV}(bloc|block|section|rubrique|chapitre|paragraphe|partie|heading|titre)[^.]{0,40}( de | du | d'| of | in | dans | from )"
-RE_BORNE="$RE_BORNE|${AV}(uniquement|seulement|only)[^.]{0,30}${AV}(bloc|block|section|rubrique|partie|part|lignes|lines|header|heading|resume|reprise)"
-RE_BORNE="$RE_BORNE|[0-9]+[[:space:]]+(premi|derni|first|last)|${AV}(premi[eè]res?|derni[eè]res?|first|last|top)[[:space:]]+[0-9]+"
-RE_BORNE="$RE_BORNE|${AV}(head|tail)[[:space:]]+-|${AV}sed[[:space:]]+-n|[0-9]+[[:space:]]+(lignes|entrees|entrées|lines|entries)"
-RE_BORNE="$RE_BORNE|${AV}(haut|debut|début|top|beginning|start)[[:space:]]+(de|du|of)[[:space:]]+(la |le |l'|the )?[A-Za-z0-9_./-]*[.]md"
-RE_BORNE="$RE_BORNE|jusqu|${AV}(until|up to)${AV}|§"
-# Les lignes d'un fichier hors blocs de code, chacune precedee de son numero et de « : ».
-lignes_numerotees() { # <fichier>
+RE_BOUND="${AV}(bloc|block|section|rubrique|chapitre|paragraphe|partie|heading|titre)[^.]{0,40}( de | du | d'| of | in | dans | from )"
+RE_BOUND="$RE_BOUND|${AV}(uniquement|seulement|only)[^.]{0,30}${AV}(bloc|block|section|rubrique|partie|part|lignes|lines|header|heading|resume|reprise)"
+RE_BOUND="$RE_BOUND|[0-9]+[[:space:]]+(premi|derni|first|last)|${AV}(premi[eè]res?|derni[eè]res?|first|last|top)[[:space:]]+[0-9]+"
+RE_BOUND="$RE_BOUND|${AV}(head|tail)[[:space:]]+-|${AV}sed[[:space:]]+-n|[0-9]+[[:space:]]+(lignes|entrees|entrées|lines|entries)"
+RE_BOUND="$RE_BOUND|${AV}(haut|debut|début|top|beginning|start)[[:space:]]+(de|du|of)[[:space:]]+(la |le |l'|the )?[A-Za-z0-9_./-]*[.]md"
+RE_BOUND="$RE_BOUND|jusqu|${AV}(until|up to)${AV}|§"
+# The lines of a file outside code blocks, each preceded by its number and ":".
+numbered_lines() { # <file>
   awk '/^[ \t]*```/ { f = !f; next } !f { print NR ":" $0 }' "$1"
   return 0
 }
-consignes_non_bornees() { # <fichier>
-  local f="$1" l num txt tok n vu=""
+unbounded_orders() { # <file>
+  local f="$1" l num txt tok n seen=""
   [ -f "$f" ] || return 0
   while IFS= read -r l; do
     [ -n "$l" ] || continue
     num="${l%%:*}"; txt="${l#*:}"
     if grep -qiE "$RE_NEG" <<<"$txt"; then continue; fi
-    if grep -qiE "$RE_BORNE" <<<"$txt"; then continue; fi
+    if grep -qiE "$RE_BOUND" <<<"$txt"; then continue; fi
     for tok in $(printf '%s\n' "$txt" | grep -oE '[A-Za-z0-9_./-]+\.md' | sort -u || true); do
       tok="${tok#./}"
       case "$txt" in *"$tok#"*) continue ;; esac
       [ -f "$tok" ] || continue
-      case " $vu " in *" $tok "*) continue ;; esac
-      vu="$vu $tok"
-      defauts_de "$tok"
+      case " $seen " in *" $tok "*) continue ;; esac
+      seen="$seen $tok"
+      defaults_of "$tok"
       if [ "$DA" -eq 0 ]; then DA=250; DB=300; fi
-      seuils_de "$tok" "$DA" "$DB"
-      n="$(lignes "$tok")"
-      if [ "$n" -gt "$SEUIL_B" ]; then
-        alerte "$f : ordonne de lire $tok sans borner la lecture (ligne $num), or il fait $n lignes, seuil de blocage $SEUIL_B. Nommer la partie a lire, par exemple « le bloc de reprise de $tok »" "$f"
+      thresholds_of "$tok" "$DA" "$DB"
+      n="$(count_lines "$tok")"
+      if [ "$n" -gt "$THR_B" ]; then
+        warn "$f: orders reading $tok without bounding the read (line $num), yet it is $n lines, blocker threshold $THR_B. Name the part to read, for example « the resume block of $tok »" "$f"
       fi
     done
-  done <<FIN
-$(lignes_numerotees "$f" | grep -iE "$RE_ORDRE" || true)
-FIN
+  done <<EOT
+$(numbered_lines "$f" | grep -iE "$RE_ORDER" || true)
+EOT
   return 0
 }
-consignes_non_bornees CLAUDE.md
-if [ -f AGENTS.md ] && ! [ CLAUDE.md -ef AGENTS.md ]; then consignes_non_bornees AGENTS.md; fi
+unbounded_orders CLAUDE.md
+if [ -f AGENTS.md ] && ! [ CLAUDE.md -ef AGENTS.md ]; then unbounded_orders AGENTS.md; fi
 
-# CODEMAP de la racine, et sa section la plus lourde
+# Root CODEMAP, and its heaviest section
 if [ -f CODEMAP.md ]; then
-  mesure CODEMAP.md "CODEMAP.md" 300 400 40000 CODEMAP.md 30000
+  measure CODEMAP.md "CODEMAP.md" 300 400 40000 CODEMAP.md 30000
   sm="$(section_max CODEMAP.md)"
   [ -n "$sm" ] && [ "${sm%% *}" -gt 60 ] \
-    && info "section la plus lourde du CODEMAP : ${sm#* }, ${sm%% *} lignes. Au-dessus de 60, elle appelle une zone ou une fiche"
+    && info "heaviest CODEMAP section: ${sm#* }, ${sm%% *} lines. Above 60, it calls for a zone or a page"
 fi
 
-# TODOS : le fichier, le bloc de reprise, et ce qui n'a rien a y faire
+# TODOS: the file, the resume block, and what has no business there
 if [ -f TODOS.md ]; then
-  mesure TODOS.md "TODOS.md" 200 300 30000 TODOS.md 20000
-  nb="$(bloc_reprise_lignes TODOS.md)"
-  seuils_de reprise 50 80
-  if   [ "$nb" -gt "$SEUIL_B" ]; then blocage "bloc Etat a la reprise : $nb lignes, seuil de blocage $SEUIL_B. Il se reecrit depuis l'etat courant, il ne s'empile pas"
-  elif [ "$nb" -gt "$SEUIL_A" ]; then alerte "bloc Etat a la reprise : $nb lignes, seuil d'alerte $SEUIL_A"
-  elif [ "$nb" -gt 0 ];  then ok "bloc Etat a la reprise : $nb lignes"; fi
+  measure TODOS.md "TODOS.md" 200 300 30000 TODOS.md 20000
+  nb="$(resume_block_lines TODOS.md)"
+  thresholds_of reprise 50 80
+  if   [ "$nb" -gt "$THR_B" ]; then block "Resume state block: $nb lines, blocker threshold $THR_B. It is rewritten from the current state, it does not pile up"
+  elif [ "$nb" -gt "$THR_A" ]; then warn "Resume state block: $nb lines, warning threshold $THR_A"
+  elif [ "$nb" -gt 0 ];  then ok "Resume state block: $nb lines"; fi
   nc="$(grep -c '^- \[x\]' TODOS.md || true)"
-  [ "${nc:-0}" -gt 0 ] && alerte "TODOS.md garde $nc tache(s) cochee(s). Une tache faite se supprime, le fait vit au CHANGELOG"
+  [ "${nc:-0}" -gt 0 ] && warn "TODOS.md keeps $nc checked task(s). A done task is deleted, the fact lives in the CHANGELOG"
   ns="$(grep -ciE '^## .*(session|séance|seance)' TODOS.md || true)"
-  [ "${ns:-0}" -gt 0 ] && alerte "TODOS.md porte $ns section(s) de compte-rendu de session. C'est du CHANGELOG, TODOS ne garde que le futur"
+  [ "${ns:-0}" -gt 0 ] && warn "TODOS.md carries $ns session report section(s). That is CHANGELOG material, TODOS keeps only the future"
 fi
 
-# CHANGELOG et tout autre journal : nombre d'entrees, longueur, entree la plus longue
-journal() { # <fichier> <libelle>
+# CHANGELOG and any other log: number of entries, length, longest entry
+journal() { # <file> <label>
   local f="$1" lib="$2" ne n em ja jb ea eb
   [ -f "$f" ] || return 0
-  ne="$(nb_entrees_datees "$f")"; n="$(lignes "$f")"
-  # `seuils: <journal>=N` fixe l'alerte en lignes, le nombre d'entrees suit dans le meme rapport.
-  seuils_de "$f" 1000 1500
-  ja="$SEUIL_A"; jb="$SEUIL_B"
+  ne="$(count_dated_entries "$f")"; n="$(count_lines "$f")"
+  # `seuils: <log>=N` sets the warning in lines, the number of entries follows in the same ratio.
+  thresholds_of "$f" 1000 1500
+  ja="$THR_A"; jb="$THR_B"
   ea=$(( 40 * ja / 1000 )); eb=$(( 60 * jb / 1500 ))
-  ajourne_de "$f"
-  if [ -n "$AJ_N" ]; then
-    : # un journal ajourne est juge par le cliquet, a la fin de la section 10
+  deferred_of "$f"
+  if [ -n "$DEF_N" ]; then
+    : # a deferred log is judged by the ratchet, at the end of section 10
   elif [ "${ne:-0}" -ge "$eb" ] || [ "$n" -gt "$jb" ]; then
-    blocage "$lib : $ne entrees, $n lignes. Seuil de blocage $eb entrees ou $jb lignes. Faire tourner : ctx-rotation.sh --fichier $f"
+    block "$lib: $ne entries, $n lines. Blocker threshold $eb entries or $jb lines. Rotate: ctx-rotation.sh --file $f"
   elif [ "${ne:-0}" -ge "$ea" ] || [ "$n" -gt "$ja" ]; then
-    alerte "$lib : $ne entrees, $n lignes. Seuil d'alerte $ea entrees ou $ja lignes. Faire tourner : ctx-rotation.sh --fichier $f"
+    warn "$lib: $ne entries, $n lines. Warning threshold $ea entries or $ja lines. Rotate: ctx-rotation.sh --file $f"
   else
-    ok "$lib : $ne entrees, $n lignes"
+    ok "$lib: $ne entries, $n lines"
   fi
-  # Le plafond de 25 lignes par entree vaut A L'ECRITURE. Un journal est
-  # append-only, on ne reecrit pas le passe, donc une vieille entree trop longue
-  # est une information et pas une alerte. Seules les trois plus recentes sont
-  # encore les nôtres a corriger.
-  em="$(entrees_du_journal "$f" | sed -n '1,3p' | sort -rn | sed -n '1p')"
+  # The cap of 25 lines per entry applies AT WRITING TIME. A log is append-only, the past
+  # is not rewritten, so an old entry that is too long is an info and not a warning. Only
+  # the three most recent are still ours to fix.
+  em="$(log_entries "$f" | sed -n '1,3p' | sort -rn | sed -n '1p')"
   if [ -n "$em" ] && [ "${em%% *}" -gt 40 ]; then
-    alerte "$lib : entree recente de ${em%% *} lignes (${em#* }). Une entree tient en 25 lignes, le detail va dans une fiche"
+    warn "$lib: recent entry of ${em%% *} lines (${em#* }). An entry fits in 25 lines, the detail goes in a page"
   else
-    ev="$(entree_max "$f")"
-    # if et pas une chaine [ ] && : la fonction doit rendre 0, sinon set -e tue l'audit
-    # sur le cas le plus sain, un journal sans entree ancienne de plus de 40 lignes.
+    ev="$(longest_entry "$f")"
+    # if and not an [ ] && chain: the function must return 0, otherwise set -e kills the audit
+    # on the healthiest case, a log without an old entry of more than 40 lines.
     if [ -n "$ev" ] && [ "${ev%% *}" -gt 40 ]; then
-      info "$lib : la plus longue entree du journal fait ${ev%% *} lignes, mais elle est ancienne. Un journal ne se reecrit pas, le plafond de 25 lignes vaut a l'ecriture"
+      info "$lib: the longest log entry is ${ev%% *} lines, but it is old. A log is not rewritten, the cap of 25 lines applies at writing time"
     fi
   fi
   return 0
 }
 journal CHANGELOG.md "CHANGELOG.md"
 
-# Les tailles des markdown, mesurees d'un coup : un wc et un grep pour tous les fichiers au
-# lieu de plusieurs sous-processus par fichier. Une ligne par fichier, `lignes<TAB>entrees
-# datees<TAB>chemin`. Les mesures fines (profondeur de titres) ne se lancent ensuite que sur
-# les fichiers qui depassent un seuil bas.
-tailles_md() { # <liste de chemins, un par ligne, sur l'entree standard>
-  local liste wc_out gr_out
-  liste="$(cat)"
-  [ -n "$liste" ] || return 0
-  # Une variable ne garde pas les octets nuls : la liste reste en lignes, xargs -0 les recoit
-  # par un tr a chaque usage. Le ./ devant chaque chemin evite qu'un nom comme `a=b.md` soit lu
-  # comme une option, et que `total` se confonde avec la ligne de total de wc.
-  wc_out="$(printf '%s\n' "$liste" | sed 's|^|./|' | tr '\n' '\000' | xargs -0 wc -l 2>/dev/null || true)"
-  gr_out="$(printf '%s\n' "$liste" | sed 's|^|./|' | tr '\n' '\000' | xargs -0 grep -cHE "$MOTIF_DATE_TITRE" 2>/dev/null || true)"
+# Markdown sizes, measured in one go: one wc and one grep for all files instead of several
+# subprocesses per file. One line per file, `lines<TAB>dated entries<TAB>path`. Fine
+# measures (heading depth) then only run on the files that exceed a low threshold.
+md_sizes() { # <list of paths, one per line, on standard input>
+  local list wc_out gr_out
+  list="$(cat)"
+  [ -n "$list" ] || return 0
+  # A variable does not keep null bytes: the list stays in lines, xargs -0 receives them
+  # through a tr at each use. The ./ in front of each path prevents a name like `a=b.md`
+  # from being read as an option, and `total` from being confused with the wc total line.
+  wc_out="$(printf '%s\n' "$list" | sed 's|^|./|' | tr '\n' '\000' | xargs -0 wc -l 2>/dev/null || true)"
+  gr_out="$(printf '%s\n' "$list" | sed 's|^|./|' | tr '\n' '\000' | xargs -0 grep -cHE "$RE_DATE_TITLE" 2>/dev/null || true)"
   { printf '%s\n' "$wc_out"; printf '@@GREP\n'; printf '%s\n' "$gr_out"; } | awk -v T="$TAB" '
     /^@@GREP$/ { gr = 1; next }
     !gr {
@@ -1619,7 +1606,7 @@ tailles_md() { # <liste de chemins, un par ligne, sur l'entree standard>
       if (i == 0) next
       p = substr($0, i + 1)
       if (p == "total") next
-      sub(/^\.\//, "", p); n[p] = substr($0, 1, i - 1); ordre[++k] = p
+      sub(/^\.\//, "", p); n[p] = substr($0, 1, i - 1); order[++k] = p
       next
     }
     {
@@ -1628,261 +1615,260 @@ tailles_md() { # <liste de chemins, un par ligne, sur l'entree standard>
       if (i == 0) next
       p = substr($0, 1, i - 1); sub(/^\.\//, "", p); e[p] = substr($0, i + 1)
     }
-    END { for (j = 1; j <= k; j++) { p = ordre[j]; print n[p] T (p in e ? e[p] : 0) T p } }'
+    END { for (j = 1; j <= k; j++) { p = order[j]; print n[p] T (p in e ? e[p] : 0) T p } }'
   return 0
 }
-TAB_MD="$(docs_md | tailles_md)"
-JOURNAUX=""
-# Les fichiers a dix entrees datees ou plus : le filtre se fait en awk, une boucle shell sur
-# plusieurs milliers de lignes coute plus qu'elle ne rapporte.
+MD_TABLE="$(docs_md | md_sizes)"
+LOGS=""
+# Files with ten dated entries or more: the filter is done in awk, a shell loop over
+# several thousand lines costs more than it brings.
 while IFS="$TAB" read -r n ne f; do
   [ -n "$f" ] || continue
   case "$f" in CHANGELOG.md|TODOS.md|CODEMAP.md|CLAUDE.md) continue ;; esac
-  JOURNAUX="$JOURNAUX$NL$f"
-  journal "$f" "journal $f"
-done <<FIN
-$(printf '%s\n' "$TAB_MD" | awk -F "$TAB" '$2 + 0 >= 10')
-FIN
+  LOGS="$LOGS$NL$f"
+  journal "$f" "log $f"
+done <<EOT
+$(printf '%s\n' "$MD_TABLE" | awk -F "$TAB" '$2 + 0 >= 10')
+EOT
 
-# fiches docs/ trop longues. Un journal a deja ete mesure comme journal, sa
-# reponse est la rotation et pas la scission.
+# docs/ pages that are too long. A log has already been measured as a log, its answer is
+# rotation and not splitting.
 if [ -n "$DOCS_DIR" ] && [ -d "$DOCS_DIR" ]; then
   while IFS="$TAB" read -r n ne f; do
     [ -n "$f" ] || continue
-    case "$JOURNAUX" in *"$NL$f"*) continue ;; esac
-    ajourne_de "$f"
-    if [ -n "$AJ_N" ]; then continue; fi
-    seuils_de "$f" 250 300
-    if   [ "$n" -gt "$SEUIL_B" ]; then blocage "$f : $n lignes, seuil de blocage $SEUIL_B. Scinder en deux sujets"
-    elif [ "$n" -gt "$SEUIL_A" ]; then alerte "$f : $n lignes, seuil d'alerte $SEUIL_A"; fi
-  done <<FIN
-$(find "$DOCS_DIR" -name '*.md' -not -name 'README.md' 2>/dev/null | sort | tailles_md)
-FIN
+    case "$LOGS" in *"$NL$f"*) continue ;; esac
+    deferred_of "$f"
+    if [ -n "$DEF_N" ]; then continue; fi
+    thresholds_of "$f" 250 300
+    if   [ "$n" -gt "$THR_B" ]; then block "$f: $n lines, blocker threshold $THR_B. Split into two topics"
+    elif [ "$n" -gt "$THR_A" ]; then warn "$f: $n lines, warning threshold $THR_A"; fi
+  done <<EOT
+$(find "$DOCS_DIR" -name '*.md' -not -name 'README.md' 2>/dev/null | sort | md_sizes)
+EOT
 fi
 
-# Profondeur de titres. Un fichier a cinq niveaux ou plus porte plusieurs sujets,
-# c'est la seule regle de decoupe chiffree qu'un guide de style publie. Signale
-# seulement au-dela de la cible, sinon c'est du bruit : on ne lit que les fichiers de plus
-# de 150 lignes.
-GROS="$(printf '%s\n' "$TAB_MD" | awk -F "$TAB" '$1 + 0 > 150 { print $3 }')"
+# Heading depth. A file with five levels or more carries several topics, it is the only
+# numeric split rule a style guide publishes. Reported only beyond the target, otherwise
+# it is noise: only files of more than 150 lines are read.
+BIG="$(printf '%s\n' "$MD_TABLE" | awk -F "$TAB" '$1 + 0 > 150 { print $3 }')"
 while IFS="$TAB" read -r d f; do
   [ -n "$f" ] || continue
-  n="$(lignes "$f")"
-  info "$f : $d niveaux de titres sur $n lignes. Au-dela de quatre, ce sont souvent plusieurs sujets a scinder"
-done <<FIN
-$(printf '%s\n' "$GROS" | profondeurs_titres)
-FIN
+  n="$(count_lines "$f")"
+  info "$f: $d heading levels over $n lines. Beyond four, it is often several topics to split"
+done <<EOT
+$(printf '%s\n' "$BIG" | heading_depths)
+EOT
 
-# zones existantes
+# existing zones
 for z in $ZONES; do
-  mesure "$z/CODEMAP.md" "carte de zone $z" 200 250 25000 "$z/CODEMAP.md" 20000
-  [ -f "$z/CLAUDE.md" ] && mesure "$z/CLAUDE.md" "CLAUDE.md de zone $z" 40 60
+  measure "$z/CODEMAP.md" "zone map $z" 200 250 25000 "$z/CODEMAP.md" 20000
+  [ -f "$z/CLAUDE.md" ] && measure "$z/CLAUDE.md" "zone CLAUDE.md $z" 40 60
 done
-for c in $(trouver . -name CLAUDE.md -path './*/*' -not -path './.claude/*' | sort); do
+for c in $(find_pruned . -name CLAUDE.md -path './*/*' -not -path './.claude/*' | sort); do
   d="${c%/CLAUDE.md}"; d="${d#./}"
-  [ -f "$d/CODEMAP.md" ] || mesure "$c" "CLAUDE.md de zone $d" 40 60
+  [ -f "$d/CODEMAP.md" ] || measure "$c" "zone CLAUDE.md $d" 40 60
 done
 
-# Longueur de LIGNE dans les fichiers d'etat. Un budget compte en lignes ne voit pas une
-# cellule de tableau qui a avale une preuve entiere. Au-dela du seuil (800 par defaut,
-# `seuils: ligne=N`), une alerte par fichier. Les blocs de code ``` ne comptent pas.
-seuils_de ligne 800 0
-SEUIL_LIGNE="$SEUIL_A"
-lignes_longues() { # <fichier> : « nombre numero longueur » des lignes hors bloc de code au-dela du seuil
-  # La longueur se compte en caracteres : avec mawk, length compte des octets, et une ligne de
-  # 508 caracteres accentues passait pour une ligne de plus de 800. En C, tr retire les octets
-  # de continuation UTF-8 (0x80 a 0xBF), il ne reste qu'un octet par caractere. Le filtre se
-  # fait avant awk et non dans awk : un awk qui lit l'UTF-8 lui-meme lirait l'intervalle comme
-  # des points de code. Les sauts de ligne restent, la numerotation est intacte.
-  LC_ALL=C tr -d '\200-\277' < "$1" | LC_ALL=C awk -v s="$SEUIL_LIGNE" '
+# LINE length in the state files. A budget counted in lines does not see a table cell that
+# swallowed a whole proof. Beyond the threshold (800 by default, `seuils: ligne=N`), one
+# warning per file. ``` code blocks do not count.
+thresholds_of ligne 800 0
+LINE_LIMIT="$THR_A"
+long_lines() { # <file>: "number line_number length" of the lines outside code blocks beyond the threshold
+  # The length is counted in characters: with mawk, length counts bytes, and a line of 508
+  # accented characters passed for a line of more than 800. In C, tr removes the UTF-8
+  # continuation bytes (0x80 to 0xBF), only one byte per character remains. The filter is
+  # done before awk and not in awk: an awk that reads UTF-8 itself would read the range as
+  # code points. Newlines stay, the numbering is intact.
+  LC_ALL=C tr -d '\200-\277' < "$1" | LC_ALL=C awk -v s="$LINE_LIMIT" '
     /^[ \t]*```/ { f = !f; next }
     !f && length($0) > s { n++; if (length($0) > m) { m = length($0); l = NR } }
     END { if (n > 0) print n, l, m }'
   return 0
 }
-LL_VUS=" "
+LL_SEEN=" "
 for f in TODOS.md CODEMAP.md CLAUDE.md CHANGELOG.md \
   $(for z in $ZONES; do printf '%s\n' "$z/CODEMAP.md" "$z/CLAUDE.md"; done) \
-  $(trouver . -name CLAUDE.md -path './*/*' -not -path './.claude/*' | sed 's|^\./||' | sort); do
+  $(find_pruned . -name CLAUDE.md -path './*/*' -not -path './.claude/*' | sed 's|^\./||' | sort); do
   [ -f "$f" ] || continue
-  case "$LL_VUS" in *" $f "*) continue ;; esac
-  LL_VUS="$LL_VUS$f "
-  ll="$(lignes_longues "$f")"
+  case "$LL_SEEN" in *" $f "*) continue ;; esac
+  LL_SEEN="$LL_SEEN$f "
+  ll="$(long_lines "$f")"
   [ -n "$ll" ] || continue
   read -r ll_n ll_num ll_max <<<"$ll"
-  alerte "$f : $ll_n ligne(s) de plus de $SEUIL_LIGNE caracteres, la plus longue est la ligne $ll_num ($ll_max caracteres). Sortir la preuve vers une fiche docs/ ou archives/, la ligne garde le fait, sa date et un pointeur" "$f"
+  warn "$f: $ll_n line(s) of more than $LINE_LIMIT characters, the longest is line $ll_num ($ll_max characters). Move the proof to a docs/ or archives/ page, the line keeps the fact, its date and a pointer" "$f"
 done
 
-# zones candidates : un repertoire de code de 25 fichiers ou plus, sans carte.
-# Simple information tant que le CODEMAP de la racine tient son budget ou que le
-# projet est petit, alerte des qu'il deborde sur un projet moyen ou grand, parce
-# que c'est la sortie naturelle de ce qui deborde.
-CM_LIGNES=0; [ -f CODEMAP.md ] && CM_LIGNES="$(lignes CODEMAP.md)"
+# candidate zones: a code directory of 25 files or more, without a map.
+# A plain info as long as the root CODEMAP holds its budget or the project is small, a
+# warning as soon as it overflows on a medium or large project, because it is the natural
+# way out for what overflows.
+CM_LINES=0; [ -f CODEMAP.md ] && CM_LINES="$(count_lines CODEMAP.md)"
 BASES=""
 for d in src lib app packages apps internal cmd services; do [ -d "$d" ] && BASES="$BASES $d"; done
 [ -n "$BASES" ] || BASES="."
-candidats=0
+candidates=0
 for base in $BASES; do
-  # En elagage : un dossier que la liste elague (Library/ d'un Unity, dist/, un CACHEDIR.TAG)
-  # n'est pas un candidat, `-not -path X/*` ne retire que son contenu et pas lui.
+  # As pruning: a folder that the list prunes (an Unity Library/, dist/, a CACHEDIR.TAG) is
+  # not a candidate, `-not -path X/*` only removes its content and not itself.
   for m in $(find "$base" -mindepth 1 -maxdepth 1 "${PRUNE[@]}" -o -type d -print 2>/dev/null | sort); do
-    nom="${m#./}"
-    case "$(basename "$nom")" in .*|docs|"${DOCS_DIR##*/}"|archives|tests|test|scripts|node_modules|__pycache__) continue ;; esac
-    [ -f "$nom/CODEMAP.md" ] && continue
-    nf="$(trouver "$nom" -type f | wc -l | tr -d ' ')"
+    name="${m#./}"
+    case "$(basename "$name")" in .*|docs|"${DOCS_DIR##*/}"|archives|tests|test|scripts|node_modules|__pycache__) continue ;; esac
+    [ -f "$name/CODEMAP.md" ] && continue
+    nf="$(find_pruned "$name" -type f | wc -l | tr -d ' ')"
     [ "$nf" -ge 25 ] || continue
-    mentions="$(grep -c "$(basename "$nom")" CODEMAP.md 2>/dev/null || true)"
-    candidats=$((candidats + 1))
-    if [ "$TAILLE" != petite ] && { [ "$CM_LIGNES" -gt 300 ] || [ "$TAILLE" = grande ]; }; then
-      alerte "zone candidate : $nom, $nf fichiers, cite ${mentions:-0} fois dans le CODEMAP. Lui donner sa carte : ctx-init.sh --zone $nom"
+    mentions="$(grep -c "$(basename "$name")" CODEMAP.md 2>/dev/null || true)"
+    candidates=$((candidates + 1))
+    if [ "$SIZE" != petite ] && { [ "$CM_LINES" -gt 300 ] || [ "$SIZE" = grande ]; }; then
+      warn "candidate zone: $name, $nf files, cited ${mentions:-0} times in the CODEMAP. Give it its map: ctx-init.sh --zone $name"
     else
-      info "zone possible : $nom, $nf fichiers, cite ${mentions:-0} fois dans le CODEMAP"
+      info "possible zone: $name, $nf files, cited ${mentions:-0} times in the CODEMAP"
     fi
   done
 done
-[ "$candidats" -eq 0 ] && [ -n "$ZONES" ] && ok "chaque repertoire de code assez gros porte sa carte"
+[ "$candidates" -eq 0 ] && [ -n "$ZONES" ] && ok "each code directory big enough carries its map"
 
-# Regles `.claude/rules/*.md`. Une regle sans `paths:` se charge a chaque session, au meme
-# titre que le CLAUDE.md racine : son poids compte. Une regle en `globs:` ne se charge
-# jamais par chemin, seul `paths:` est lu, elle tombe donc dans le cas precedent.
-fm_cle() { # <fichier> <cle> : code 0 si l'en-tete YAML du fichier porte la cle
-  awk -v k="$2" 'NR == 1 { if ($0 !~ /^---[ \t\r]*$/) exit; dedans = 1; next }
-       dedans && /^---[ \t\r]*$/ { exit }
-       dedans && index($0, k ":") == 1 { t = 1; exit }
+# Rules `.claude/rules/*.md`. A rule without `paths:` loads at every session, like the root
+# CLAUDE.md: its weight counts. A `globs:` rule never loads by path, only `paths:` is read,
+# so it falls into the previous case.
+fm_key() { # <file> <key>: code 0 if the file's YAML header carries the key
+  awk -v k="$2" 'NR == 1 { if ($0 !~ /^---[ \t\r]*$/) exit; inside = 1; next }
+       inside && /^---[ \t\r]*$/ { exit }
+       inside && index($0, k ":") == 1 { t = 1; exit }
        END { exit t ? 0 : 1 }' "$1" 2>/dev/null
 }
-REGLES_LIGNES=0
-REGLES_CARS=0
-REGLES_NB=0
-REGLES_LISTE=""
+RULES_LINES=0
+RULES_CHARS=0
+RULES_NB=0
+RULES_LIST=""
 if [ -d .claude/rules ]; then
   for r in $(find .claude/rules -type f -name '*.md' 2>/dev/null | LC_ALL=C sort); do
-    if fm_cle "$r" globs; then
-      alerte "$r : declare globs:, que Claude Code ne lit pas. Seul paths: la charge quand un fichier concerne est touche. Telle quelle elle se charge a chaque session" "$r"
+    if fm_key "$r" globs; then
+      warn "$r: declares globs:, which Claude Code does not read. Only paths: loads it when a related file is touched. As is, it loads at every session" "$r"
     fi
-    if ! fm_cle "$r" paths; then
-      n="$(lignes "$r")"
-      REGLES_LIGNES=$((REGLES_LIGNES + n))
-      REGLES_CARS=$((REGLES_CARS + $(caracteres "$r")))
-      REGLES_NB=$((REGLES_NB + 1))
-      REGLES_LISTE="${REGLES_LISTE:+$REGLES_LISTE, }${r#.claude/rules/} ($n)"
+    if ! fm_key "$r" paths; then
+      n="$(count_lines "$r")"
+      RULES_LINES=$((RULES_LINES + n))
+      RULES_CHARS=$((RULES_CHARS + $(count_chars "$r")))
+      RULES_NB=$((RULES_NB + 1))
+      RULES_LIST="${RULES_LIST:+$RULES_LIST, }${r#.claude/rules/} ($n)"
     fi
   done
 fi
-if [ "$REGLES_NB" -gt 0 ]; then
-  seuils_de regles-sans-paths 150 200
-  if   [ "$REGLES_LIGNES" -gt "$SEUIL_B" ]; then
-    blocage "regles sans paths : $REGLES_LIGNES lignes chargees d'office a chaque session, seuil de blocage $SEUIL_B ($REGLES_LISTE). Leur donner un paths:" .claude/rules
-  elif [ "$REGLES_LIGNES" -gt "$SEUIL_A" ]; then
-    alerte "regles sans paths : $REGLES_LIGNES lignes chargees d'office a chaque session, seuil d'alerte $SEUIL_A ($REGLES_LISTE). Leur donner un paths:" .claude/rules
+if [ "$RULES_NB" -gt 0 ]; then
+  thresholds_of regles-sans-paths 150 200
+  if   [ "$RULES_LINES" -gt "$THR_B" ]; then
+    block "rules without paths: $RULES_LINES lines loaded by default at every session, blocker threshold $THR_B ($RULES_LIST). Give them a paths:" .claude/rules
+  elif [ "$RULES_LINES" -gt "$THR_A" ]; then
+    warn "rules without paths: $RULES_LINES lines loaded by default at every session, warning threshold $THR_A ($RULES_LIST). Give them a paths:" .claude/rules
   else
-    info "$REGLES_NB regle(s) sans paths, $REGLES_LIGNES lignes chargees d'office a chaque session : $REGLES_LISTE"
+    info "$RULES_NB rule(s) without paths, $RULES_LINES lines loaded by default at every session: $RULES_LIST"
   fi
 fi
 
-# Imports `@fichier` d'un fichier : ce qu'il charge en plus de lui-meme. Les blocs de code
-# et les spans de code n'importent rien. Chemins relatifs au fichier qui importe.
-imports_de() { # <fichier> -> chemins existants depuis la racine, un par ligne
+# `@file` imports of a file: what it loads besides itself. Code blocks and code spans
+# import nothing. Paths relative to the importing file.
+imports_of() { # <file> -> existing paths from the root, one per line
   local f="$1" dir t
   dir="$(dirname "$f")"
-  for t in $(md_sans_code "$f" | grep -oE '(^|[[:space:]])@[A-Za-z0-9_./-]+' | sed 's/^[[:space:]]*@//' || true); do
+  for t in $(md_no_code "$f" | grep -oE '(^|[[:space:]])@[A-Za-z0-9_./-]+' | sed 's/^[[:space:]]*@//' || true); do
     t="${t%[.,]}"
     case "$t" in */*|*.*) ;; *) continue ;; esac
     case "$t" in /*|~*) continue ;; esac
-    normaliser "$dir/$t"
+    normalize "$dir/$t"
     if [ -f "$NORM" ]; then printf '%s\n' "$NORM"; fi
   done
   return 0
 }
-# Tous les imports atteints depuis un fichier, quatre sauts au plus, sans doublon.
-imports_atteints() { # <fichier>
-  local front="$1" tous="$1" suivants f c i=0
+# All the imports reached from a file, four hops at most, without duplicates.
+imports_reached() { # <file>
+  local front="$1" all="$1" next f c i=0
   while [ "$i" -lt 4 ] && [ -n "$front" ]; do
-    suivants=""
+    next=""
     while IFS= read -r f; do
       [ -n "$f" ] || continue
-      for c in $(imports_de "$f"); do
-        if grep -qxF "$c" <<<"$tous"; then continue; fi
-        tous="$tous
+      for c in $(imports_of "$f"); do
+        if grep -qxF "$c" <<<"$all"; then continue; fi
+        all="$all
 $c"
-        suivants="${suivants:+$suivants
+        next="${next:+$next
 }$c"
       done
-    done <<FIN
+    done <<EOT
 $front
-FIN
-    front="$suivants"
+EOT
+    front="$next"
     i=$((i + 1))
   done
-  printf '%s\n' "$tous" | sed 1d
+  printf '%s\n' "$all" | sed 1d
   return 0
 }
 
-# Cout total de reprise : tout ce qu'une session charge avant la premiere question.
-# CLAUDE.md, ses imports, les regles sans paths, le bloc de reprise, la carte racine et
-# les trois dernieres entrees du journal.
-c_claude=0; c_imports=0; c_reprise=0; c_carte=0; c_journal=0
-# Le meme cout en caracteres : k_* est a c_* ce que les caracteres sont aux lignes.
-k_claude=0; k_imports=0; k_reprise=0; k_carte=0; k_journal=0
+# Total resume cost: everything a session loads before the first question. CLAUDE.md, its
+# imports, the rules without paths, the resume block, the root map and the last three log
+# entries.
+c_claude=0; c_imports=0; c_resume=0; c_map=0; c_log=0
+# The same cost in characters: k_* is to c_* what characters are to lines.
+k_claude=0; k_imports=0; k_resume=0; k_map=0; k_log=0
 if [ -f CLAUDE.md ]; then
-  c_claude="$(lignes CLAUDE.md)"; k_claude="$(caracteres CLAUDE.md)"
-  for f in $(imports_atteints CLAUDE.md); do
-    c_imports=$((c_imports + $(lignes "$f")))
-    k_imports=$((k_imports + $(caracteres "$f")))
+  c_claude="$(count_lines CLAUDE.md)"; k_claude="$(count_chars CLAUDE.md)"
+  for f in $(imports_reached CLAUDE.md); do
+    c_imports=$((c_imports + $(count_lines "$f")))
+    k_imports=$((k_imports + $(count_chars "$f")))
   done
 elif [ -f AGENTS.md ]; then
-  c_claude="$(lignes AGENTS.md)"; k_claude="$(caracteres AGENTS.md)"
-  for f in $(imports_atteints AGENTS.md); do
-    c_imports=$((c_imports + $(lignes "$f")))
-    k_imports=$((k_imports + $(caracteres "$f")))
+  c_claude="$(count_lines AGENTS.md)"; k_claude="$(count_chars AGENTS.md)"
+  for f in $(imports_reached AGENTS.md); do
+    c_imports=$((c_imports + $(count_lines "$f")))
+    k_imports=$((k_imports + $(count_chars "$f")))
   done
 fi
 if [ -f TODOS.md ]; then
-  c_reprise="$(bloc_reprise_lignes TODOS.md)"
-  if [ "$c_reprise" -gt 0 ]; then
-    k_reprise="$(awk -v re="$RE_BLOC" '/^## /{ if (dans) exit; if (tolower($0) ~ re) dans=1 } dans' TODOS.md 2>/dev/null | caracteres_stdin)"
+  c_resume="$(resume_block_lines TODOS.md)"
+  if [ "$c_resume" -gt 0 ]; then
+    k_resume="$(awk -v re="$RE_BLOCK" '/^## /{ if (inside) exit; if (tolower($0) ~ re) inside=1 } inside' TODOS.md 2>/dev/null | count_chars_stdin)"
   fi
 fi
-if [ -f CODEMAP.md ]; then c_carte="$(lignes CODEMAP.md)"; k_carte="$(caracteres CODEMAP.md)"; fi
+if [ -f CODEMAP.md ]; then c_map="$(count_lines CODEMAP.md)"; k_map="$(count_chars CODEMAP.md)"; fi
 if [ -f CHANGELOG.md ]; then
-  for n in $(entrees_du_journal CHANGELOG.md | sed -n '1,3p' | awk '{print $1}'); do
-    c_journal=$((c_journal + n))
+  for n in $(log_entries CHANGELOG.md | sed -n '1,3p' | awk '{print $1}'); do
+    c_log=$((c_log + n))
   done
-  # Les trois premieres entrees du fichier, de la premiere ligne datee sur c_journal lignes.
-  if [ "$c_journal" -gt 0 ]; then
-    motif_du_journal CHANGELOG.md
-    jdeb="$(grep -nE "$JMOTIF" CHANGELOG.md 2>/dev/null | sed -n '1p' | cut -d: -f1 || true)"
-    if [ -n "$jdeb" ]; then
-      k_journal="$(sed -n "${jdeb},$((jdeb + c_journal - 1))p" CHANGELOG.md | caracteres_stdin)"
+  # The first three entries of the file, from the first dated line over c_log lines.
+  if [ "$c_log" -gt 0 ]; then
+    log_pattern_of CHANGELOG.md
+    jstart="$(grep -nE "$LOG_RE" CHANGELOG.md 2>/dev/null | sed -n '1p' | cut -d: -f1 || true)"
+    if [ -n "$jstart" ]; then
+      k_log="$(sed -n "${jstart},$((jstart + c_log - 1))p" CHANGELOG.md | count_chars_stdin)"
     fi
   fi
 fi
-c_total=$((c_claude + c_imports + REGLES_LIGNES + c_reprise + c_carte + c_journal))
-k_total=$((k_claude + k_imports + REGLES_CARS + k_reprise + k_carte + k_journal))
-c_detail="CLAUDE.md $c_claude, imports $c_imports, regles sans paths $REGLES_LIGNES, bloc de reprise $c_reprise, carte racine $c_carte, trois dernieres entrees du journal $c_journal"
-seuils_de cout-reprise 600 900
-if   [ "$c_total" -gt "$SEUIL_B" ]; then
-  blocage "cout de reprise : $c_total lignes chargees avant la premiere question, seuil de blocage $SEUIL_B ($c_detail)" CLAUDE.md
-elif [ "$c_total" -gt "$SEUIL_A" ]; then
-  alerte "cout de reprise : $c_total lignes chargees avant la premiere question, seuil d'alerte $SEUIL_A ($c_detail)" CLAUDE.md
+c_total=$((c_claude + c_imports + RULES_LINES + c_resume + c_map + c_log))
+k_total=$((k_claude + k_imports + RULES_CHARS + k_resume + k_map + k_log))
+c_detail="CLAUDE.md $c_claude, imports $c_imports, rules without paths $RULES_LINES, resume block $c_resume, root map $c_map, last three log entries $c_log"
+thresholds_of cout-reprise 600 900
+if   [ "$c_total" -gt "$THR_B" ]; then
+  block "resume cost: $c_total lines loaded before the first question, blocker threshold $THR_B ($c_detail)" CLAUDE.md
+elif [ "$c_total" -gt "$THR_A" ]; then
+  warn "resume cost: $c_total lines loaded before the first question, warning threshold $THR_A ($c_detail)" CLAUDE.md
 else
-  ok "cout de reprise : $c_total lignes ($c_detail)"
+  ok "resume cost: $c_total lines ($c_detail)"
 fi
-# Meme somme en caracteres : cent par ligne de budget, donc 60 000 et 90 000. Une carte de
-# 191 lignes qui pese 126 000 caracteres passe le budget en lignes sans passer celui-ci. Les
-# tokens (caracteres / 4, arrondi) ne sont qu'un ordre de grandeur, dans le message seulement.
-k_detail="CLAUDE.md $k_claude, imports $k_imports, regles sans paths $REGLES_CARS, bloc de reprise $k_reprise, carte racine $k_carte, trois dernieres entrees du journal $k_journal"
+# The same sum in characters: a hundred per budget line, so 60,000 and 90,000. A map of 191
+# lines that weighs 126,000 characters passes the line budget without passing this one.
+# Tokens (characters / 4, rounded) are only an order of magnitude, in the message only.
+k_detail="CLAUDE.md $k_claude, imports $k_imports, rules without paths $RULES_CHARS, resume block $k_resume, root map $k_map, last three log entries $k_log"
 k_tokens=$(((k_total + 2) / 4))
-seuils_de car-cout-reprise 60000 90000
-if   [ "$k_total" -gt "$SEUIL_B" ]; then
-  blocage "cout de reprise : $k_total caracteres (environ $k_tokens tokens) charges avant la premiere question, seuil de blocage $SEUIL_B ($k_detail)" CLAUDE.md
-elif [ "$k_total" -gt "$SEUIL_A" ]; then
-  alerte "cout de reprise : $k_total caracteres (environ $k_tokens tokens) charges avant la premiere question, seuil d'alerte $SEUIL_A ($k_detail)" CLAUDE.md
+thresholds_of car-cout-reprise 60000 90000
+if   [ "$k_total" -gt "$THR_B" ]; then
+  block "resume cost: $k_total characters (about $k_tokens tokens) loaded before the first question, blocker threshold $THR_B ($k_detail)" CLAUDE.md
+elif [ "$k_total" -gt "$THR_A" ]; then
+  warn "resume cost: $k_total characters (about $k_tokens tokens) loaded before the first question, warning threshold $THR_A ($k_detail)" CLAUDE.md
 fi
 
-# Cliquet `ajourne:`. Le fichier ne doit plus grossir au-dela de sa valeur gelee, et
-# l'entree doit sortir des qu'il repasse sous son seuil d'alerte.
-if [ -n "$AJOURNE" ]; then
+# Ratchet `ajourne:`. The file must no longer grow beyond its frozen value, and the entry
+# must leave as soon as it goes back under its warning threshold.
+if [ -n "$DEFERRED" ]; then
   while IFS= read -r e; do
     trim "$e"; e="${TRIM#./}"
     [ -n "$e" ] || continue
@@ -1890,55 +1876,55 @@ if [ -n "$AJOURNE" ]; then
     case "$e" in
       *=*@*)
         trim "${e%%=*}"; ajf="$TRIM"
-        trim "${e#*=}"; reste="$TRIM"
-        trim "${reste%%@*}"; ajn="$TRIM"
-        trim "${reste#*@}"; ajd="$TRIM" ;;
+        trim "${e#*=}"; rest="$TRIM"
+        trim "${rest%%@*}"; ajn="$TRIM"
+        trim "${rest#*@}"; ajd="$TRIM" ;;
     esac
     case "$ajn" in ''|*[!0-9]*) ajn="" ;; esac
     if [ -z "$ajf" ] || [ -z "$ajn" ] || [ -z "$ajd" ]; then
-      alerte "ajourne : l'entree « $e » est illisible, la forme est fichier=lignes@AAAA-MM-JJ" "$(conv_trouver)"
+      warn "ajourne: the entry « $e » is unreadable, the form is file=lines@YYYY-MM-DD" "$(conv_find)"
       continue
     fi
     if [ ! -f "$ajf" ]; then
-      alerte "ajourne : $ajf n'existe pas, retirer l'entree $ajf=$ajn@$ajd" "$ajf"
+      warn "ajourne: $ajf does not exist, remove the entry $ajf=$ajn@$ajd" "$ajf"
       continue
     fi
-    # Un CLAUDE.md reduit a un renvoi ne porte rien : l'ajournement vise les regles, donc le
-    # fichier cible, comme la mesure de plus haut.
+    # A CLAUDE.md reduced to a redirect carries nothing: the deferral targets the rules, so
+    # the target file, like the measure above.
     ajm="$ajf"; ajnote=""
-    if [ "$ajf" = CLAUDE.md ] && [ -n "$CLAUDE_RENVOI" ] && [ -f "$CLAUDE_RENVOI" ]; then
-      ajm="$CLAUDE_RENVOI"; ajnote=" Fichier mesure : $CLAUDE_RENVOI, qui porte les regles de CLAUDE.md."
+    if [ "$ajf" = CLAUDE.md ] && [ -n "$CLAUDE_REDIRECT" ] && [ -f "$CLAUDE_REDIRECT" ]; then
+      ajm="$CLAUDE_REDIRECT"; ajnote=" Measured file: $CLAUDE_REDIRECT, which carries the rules of CLAUDE.md."
     fi
-    n="$(lignes "$ajm")"
-    defauts_de "$ajf"
-    seuils_de "$ajf" "$DA" "$DB"
+    n="$(count_lines "$ajm")"
+    defaults_of "$ajf"
+    thresholds_of "$ajf" "$DA" "$DB"
     if [ "$n" -gt "$ajn" ]; then
-      blocage "$ajf : $n lignes, plus que son ajournement ($ajn lignes depuis le $ajd). Un depassement gele ne grossit plus. Couper au moins jusqu'a $ajn lignes.$ajnote" "$ajf"
-    elif [ "$DA" -gt 0 ] && [ "$n" -le "$SEUIL_A" ]; then
-      alerte "$ajf : $n lignes, repasse sous son seuil d'alerte ($SEUIL_A). Retirer l'entree ajourne $ajf=$ajn@$ajd.$ajnote" "$ajf"
+      block "$ajf: $n lines, more than its deferral ($ajn lines since $ajd). A frozen overshoot no longer grows. Cut at least down to $ajn lines.$ajnote" "$ajf"
+    elif [ "$DA" -gt 0 ] && [ "$n" -le "$THR_A" ]; then
+      warn "$ajf: $n lines, back under its warning threshold ($THR_A). Remove the ajourne entry $ajf=$ajn@$ajd.$ajnote" "$ajf"
     else
-      jours_depuis "$ajd"; jr="$JOURS"
-      info "$ajf : $n lignes, ajourne a $ajn depuis le $ajd${jr:+ ($jr jours)}. Il ne doit plus grossir.$ajnote" "$ajf"
+      days_since "$ajd"; jr="$DAYS"
+      info "$ajf: $n lines, deferred at $ajn since $ajd${jr:+ ($jr days)}. It must no longer grow.$ajnote" "$ajf"
     fi
-  done <<FIN
-$(printf '%s\n' "$AJOURNE" | tr ',' '\n')
-FIN
+  done <<EOT
+$(printf '%s\n' "$DEFERRED" | tr ',' '\n')
+EOT
 fi
 
-if [ "$BUDGET_SEUL" -eq 0 ]; then
+if [ "$BUDGET_ONLY" -eq 0 ]; then
 
-# --- 11. structure et hygiene du contexte -------------------------------------
-# Ce que la section 10 ne mesure pas en lignes : les plans finis, les resumes qui
-# derivent, la memoire automatique, les sous-modules, les pieges, les agents.
+# --- 11. structure and hygiene ------------------------------------------------
+# What section 10 does not measure in lines: finished plans, drifting summaries, automatic
+# memory, submodules, pitfalls, agents.
 echo
-echo "11. Structure et hygiene"
+echo "11. Structure and hygiene"
 SEC=11
 
-# Valeur d'une cle de l'en-tete YAML d'un fichier, sans guillemets. Vide si absente.
-fm_valeur() { # <fichier> <cle>
-  awk -v k="$2" 'NR == 1 { if ($0 !~ /^---[ \t\r]*$/) exit; dedans = 1; next }
-       dedans && /^---[ \t\r]*$/ { exit }
-       dedans && index($0, k ":") == 1 {
+# Value of a key in a file's YAML header, without quotes. Empty if absent.
+fm_value() { # <file> <key>
+  awk -v k="$2" 'NR == 1 { if ($0 !~ /^---[ \t\r]*$/) exit; inside = 1; next }
+       inside && /^---[ \t\r]*$/ { exit }
+       inside && index($0, k ":") == 1 {
          v = substr($0, length(k) + 2)
          gsub(/"/, "", v); gsub(/\047/, "", v)
          sub(/^[ \t]+/, "", v); sub(/[ \t\r]+$/, "", v)
@@ -1947,64 +1933,64 @@ fm_valeur() { # <fichier> <cle>
   return 0
 }
 
-# Plans executes. La regle d'un plan « termine » est celle de ctx-rotation.sh --plans, on
-# l'appelle en simulation au lieu de la recopier. Un plan fini qui garde des cases ouvertes
-# ou depasse 300 lignes n'a pas ete compresse.
-if [ -n "$PLANS_DIR" ] && [ -d "$PLANS_DIR" ] && [ -f "$DIR_SCRIPTS/ctx-rotation.sh" ]; then
-  if [ -n "$ROT_SORTIE" ]; then
+# Executed plans. The rule for a "finished" plan is that of ctx-rotation.sh --plans, it is
+# called as a dry run instead of copied. A finished plan that keeps open boxes or goes
+# over 300 lines has not been compressed.
+if [ -n "$PLANS_DIR" ] && [ -d "$PLANS_DIR" ] && [ -f "$SCRIPTS_DIR/ctx-rotation.sh" ]; then
+  if [ -n "$ROT_OUT" ]; then
     wait "$ROT_PID" 2>/dev/null || true
     ROT_PID=""
-    sortie_plans="$(cat "$ROT_SORTIE")"
+    plans_output="$(cat "$ROT_OUT")"
   else
-    sortie_plans="$(bash "$DIR_SCRIPTS/ctx-rotation.sh" --plans --dry-run --root "$ROOT" 2>/dev/null || true)"
+    plans_output="$(bash "$SCRIPTS_DIR/ctx-rotation.sh" --plans --dry-run --root "$ROOT" 2>/dev/null || true)"
   fi
-  nbp=0; mauvais=0
+  nbp=0; bad_plans=0
   while IFS= read -r l; do
     case "$l" in "  - "*) ;; *) continue ;; esac
     p="${l#  - }"; p="${p%% *}"
     [ -f "$p" ] || continue
     nbp=$((nbp + 1))
-    n="$(lignes "$p")"
+    n="$(count_lines "$p")"
     o="$(grep -c '\[ \]' "$p" || true)"
     if [ "${o:-0}" -gt 0 ] || [ "$n" -gt 300 ]; then
-      mauvais=$((mauvais + 1))
-      alerte "$p : plan execute qui reste lourd ($n lignes, ${o:-0} case(s) [ ] ouverte(s), plafond 300 lignes). A compresser puis archiver : ctx-rotation.sh --plans" "$p"
+      bad_plans=$((bad_plans + 1))
+      warn "$p: executed plan that stays heavy ($n lines, ${o:-0} open [ ] box(es), cap 300 lines). To compress then archive: ctx-rotation.sh --plans" "$p"
     fi
-  done <<FIN
-$sortie_plans
-FIN
-  if [ "$mauvais" -eq 0 ]; then
-    ok "aucun plan execute a compresser"
+  done <<EOT
+$plans_output
+EOT
+  if [ "$bad_plans" -eq 0 ]; then
+    ok "no executed plan to compress"
   fi
 fi
 
-# Resumes recalculables. La section « Archive recemment » de docs/README.md resume l'index
-# des archives, qui est la source. Une ligne du resume absente de la source est fausse.
+# Recomputable summaries. The "Recently archived" section of docs/README.md summarizes the
+# archive index, which is the source. A line of the summary absent from the source is false.
 if [ -n "$DOCS_DIR" ] && [ -f "$DOCS_DIR/README.md" ] && [ -n "$ARCH_DIR" ] && [ -f "$ARCH_DIR/README.md" ]; then
-  RESUME="$(awk '/^#+ / { dans = ($0 ~ /[Aa]rchiv/); next } dans' "$DOCS_DIR/README.md")"
-  nres=0; faux=0
+  SUMMARY="$(awk '/^#+ / { inside = ($0 ~ /[Aa]rchiv/); next } inside' "$DOCS_DIR/README.md")"
+  nres=0; wrong=0
   while IFS= read -r l; do
     d="$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' <<<"$l" | sed -n '1p' || true)"
     [ -n "$d" ] || continue
     toks="$(printf '%s' "$l" | grep -oE '`[^`]+`' | tr -d '`' || true)"
     [ -n "$toks" ] || continue
     nres=$((nres + 1))
-    trouve=0
+    found=0
     while IFS= read -r t; do
       [ -n "$t" ] || continue
-      if [ -n "$(grep -F -- "$d" "$ARCH_DIR/README.md" | grep -F -- "$t" || true)" ]; then trouve=1; fi
-    done <<FIN
+      if [ -n "$(grep -F -- "$d" "$ARCH_DIR/README.md" | grep -F -- "$t" || true)" ]; then found=1; fi
+    done <<EOT
 $toks
-FIN
-    if [ "$trouve" -eq 0 ]; then
-      faux=$((faux + 1))
-      alerte "$DOCS_DIR/README.md : la ligne archivee du $d ($(head -1 <<<"$toks")) ne se retrouve pas dans $ARCH_DIR/README.md. Le resume se recalcule depuis l'index des archives" "$DOCS_DIR/README.md"
+EOT
+    if [ "$found" -eq 0 ]; then
+      wrong=$((wrong + 1))
+      warn "$DOCS_DIR/README.md: the archived line of $d ($(head -1 <<<"$toks")) is not found in $ARCH_DIR/README.md. The summary is recomputed from the archive index" "$DOCS_DIR/README.md"
     fi
-  done <<FIN
-$RESUME
-FIN
-  # La plus recente archive qui n'est pas une rotation de journal doit figurer au resume.
-  recente="$(awk -F'|' '/^\|---/ { t = 1; next }
+  done <<EOT
+$SUMMARY
+EOT
+  # The most recent archive that is not a log rotation must appear in the summary.
+  latest="$(awk -F'|' '/^\|---/ { t = 1; next }
       t && NF >= 6 {
         d = $2; o = $3; r = $6
         gsub(/^[ \t]+|[ \t]+$/, "", d); gsub(/^[ \t]+|[ \t]+$/, "", o); gsub(/^[ \t]+|[ \t]+$/, "", r)
@@ -2012,22 +1998,22 @@ FIN
         if (o == r) next
         print d "|" o; exit
       }' "$ARCH_DIR/README.md")"
-  if [ -n "$recente" ] && [ "$nres" -gt 0 ]; then
-    rd="${recente%%|*}"; ro="${recente#*|}"
+  if [ -n "$latest" ] && [ "$nres" -gt 0 ]; then
+    rd="${latest%%|*}"; ro="${latest#*|}"
     ro="$(grep -oE '`[^`]+`' <<<"$ro" | sed -n '1p' | tr -d '`' || true)"
-    if [ -n "$ro" ] && ! grep -qF -- "$ro" <<<"$RESUME" && ! grep -qF -- "$(basename "$ro")" <<<"$RESUME"; then
-      info "$DOCS_DIR/README.md : le resume « archive recemment » n'a pas la derniere archive, du $rd ($ro). Le recalculer depuis $ARCH_DIR/README.md" "$DOCS_DIR/README.md"
+    if [ -n "$ro" ] && ! grep -qF -- "$ro" <<<"$SUMMARY" && ! grep -qF -- "$(basename "$ro")" <<<"$SUMMARY"; then
+      info "$DOCS_DIR/README.md: the « recently archived » summary lacks the latest archive, of $rd ($ro). Recompute it from $ARCH_DIR/README.md" "$DOCS_DIR/README.md"
     fi
   fi
-  if [ "$nres" -gt 0 ] && [ "$faux" -eq 0 ]; then
-    ok "le resume des archives de $DOCS_DIR/README.md se retrouve dans $ARCH_DIR/README.md"
+  if [ "$nres" -gt 0 ] && [ "$wrong" -eq 0 ]; then
+    ok "the archive summary of $DOCS_DIR/README.md is found in $ARCH_DIR/README.md"
   fi
 fi
 
-# Memoire automatique du projet. Claude Code range l'index sous
-# ~/.claude/projects/<chemin du projet, tout caractere non alphanumerique en tiret>/memory/MEMORY.md
-# et ne charge que ses 200 premieres lignes. Absente, il n'y a rien a dire.
-memoire_auto_index() { # -> chemin du MEMORY.md de ce projet, rien s'il n'existe pas
+# Automatic project memory. Claude Code stores the index under
+# ~/.claude/projects/<project path, every non-alphanumeric character as a dash>/memory/MEMORY.md
+# and only loads its first 200 lines. If absent, there is nothing to say.
+auto_memory_index() { # -> path of this project's MEMORY.md, nothing if it does not exist
   local base c
   base="${CLAUDE_CONFIG_DIR:-${HOME:-}/.claude}/projects"
   for c in "$(printf '%s' "$ROOT" | sed 's/[^A-Za-z0-9]/-/g')" "$(printf '%s' "$ROOT" | sed 's|/|-|g')"; do
@@ -2035,111 +2021,111 @@ memoire_auto_index() { # -> chemin du MEMORY.md de ce projet, rien s'il n'existe
   done
   return 0
 }
-# Texte en minuscules ASCII, tout le reste en espaces simples : deux phrases qui ne
-# different que par la ponctuation ou la casse deviennent identiques.
+# Text in ASCII lowercase, everything else as single spaces: two sentences that only differ
+# by punctuation or case become identical.
 norm_txt() {
   LC_ALL=C tr '[:upper:]' '[:lower:]' | LC_ALL=C sed 's/[^a-z0-9]/ /g' | LC_ALL=C tr -s ' '
 }
-MEM="$(memoire_auto_index)"
+MEM="$(auto_memory_index)"
 if [ -n "$MEM" ]; then
-  nm="$(lignes "$MEM")"
-  seuils_de memoire-auto 150 200
-  if [ "$nm" -gt "$SEUIL_A" ]; then
-    alerte "index de la memoire automatique : $nm lignes, seuil d'alerte $SEUIL_A ($MEM). Claude Code ne charge que les 200 premieres lignes, le reste est invisible. Fusionner ou drainer les entrees dont le contenu a un proprietaire dans le depot" "$MEM"
+  nm="$(count_lines "$MEM")"
+  thresholds_of memoire-auto 150 200
+  if [ "$nm" -gt "$THR_A" ]; then
+    warn "automatic memory index: $nm lines, warning threshold $THR_A ($MEM). Claude Code only loads the first 200 lines, the rest is invisible. Merge or drain the entries whose content has an owner in the repo" "$MEM"
   else
-    ok "index de la memoire automatique : $nm lignes"
+    ok "automatic memory index: $nm lines"
   fi
-  # Entrees qui recopient CLAUDE.md : une regle de projet vit dans CLAUDE.md, la memoire
-  # garde ce qui n'a pas d'autre proprietaire. Egalite apres normalisation, 50 caracteres au moins.
+  # Entries that copy CLAUDE.md: a project rule lives in CLAUDE.md, memory keeps what has no
+  # other owner. Equality after normalization, 50 characters at least.
   if [ -f CLAUDE.md ]; then
-    BLOB="$( { cat CLAUDE.md; if [ -n "$CLAUDE_RENVOI" ] && [ -f "$CLAUDE_RENVOI" ]; then cat "$CLAUDE_RENVOI"; fi; } | norm_txt | tr '\n' ' ' | tr -s ' ')"
+    BLOB="$( { cat CLAUDE.md; if [ -n "$CLAUDE_REDIRECT" ] && [ -f "$CLAUDE_REDIRECT" ]; then cat "$CLAUDE_REDIRECT"; fi; } | norm_txt | tr '\n' ' ' | tr -s ' ')"
     memdir="$(dirname "$MEM")"
     nrec=0
     for ef in $(grep -oE '\]\([^)#:]+\.md\)' "$MEM" | sed 's/^](//; s/)$//' | sort -u || true); do
       [ -f "$memdir/$ef" ] || continue
-      copie=""
-      # Un seul awk par entree : il saute l'en-tete, normalise chaque ligne comme norm_txt
-      # (minuscules ASCII, tout le reste en espace, espaces serres, bords retires) et ne rend
-      # que les segments de 50 caracteres au moins. En C, comme norm_txt : un octet reste un
-      # octet, et tout octet hors a-z0-9 tombe dans l'espace.
+      copy=""
+      # A single awk per entry: it skips the header, normalizes each line like norm_txt
+      # (ASCII lowercase, everything else as a space, tight spaces, edges removed) and only
+      # returns segments of at least 50 characters. In C, like norm_txt: a byte stays a
+      # byte, and any byte outside a-z0-9 falls into the space.
       while IFS= read -r seg; do
-        case "$BLOB" in *"$seg"*) copie="$seg"; break ;; esac
-      done <<FIN
+        case "$BLOB" in *"$seg"*) copy="$seg"; break ;; esac
+      done <<EOT
 $(LC_ALL=C awk 'NR == 1 && /^---/ { fm = 1; next } fm && /^---/ { fm = 0; next }
      !fm { if (++n > 200) next
            s = tolower($0); gsub(/[^a-z0-9]/, " ", s); gsub(/  +/, " ", s)
            sub(/^ /, "", s); sub(/ $/, "", s)
            if (length(s) >= 50) print s }' "$memdir/$ef")
-FIN
-      if [ -n "$copie" ]; then
+EOT
+      if [ -n "$copy" ]; then
         nrec=$((nrec + 1))
-        alerte "memoire automatique : l'entree $ef recopie CLAUDE.md (« $(printf '%s' "$copie" | cut -c1-60) »). Une regle de projet vit dans CLAUDE.md, pas en double dans la memoire" "$MEM"
+        warn "automatic memory: the entry $ef copies CLAUDE.md (« $(printf '%s' "$copy" | cut -c1-60) »). A project rule lives in CLAUDE.md, not duplicated in memory" "$MEM"
       fi
     done
-    if [ "$nrec" -eq 0 ]; then ok "aucune entree de la memoire automatique ne recopie CLAUDE.md"; fi
+    if [ "$nrec" -eq 0 ]; then ok "no automatic memory entry copies CLAUDE.md"; fi
   fi
 fi
 
-# Parent et sous-modules. Un enfant qui a son propre kit n'est pas decrit comme sans kit
-# par la carte du parent, et le pointeur du parent ne retarde pas sur l'etat de l'enfant.
-# Le chemin d'un sous-module apparait-il dans la ligne comme un mot ? Un sous-module `ops` ou
-# `lib` ne doit pas se retrouver dans « workshops » ou « lib.rs » ni dans « docs/ops ». Avant :
-# debut de ligne, ou un caractere qui n'est ni lettre, ni chiffre, ni _ . / -. Apres : fin de
-# ligne, ou un caractere qui n'est ni lettre, ni chiffre, ni _ -, un point final restant permis.
-# Les backticks, les espaces, la ponctuation et le / d'un dossier bornent donc le chemin.
-mot_dans_ligne() { # <chemin> <ligne> : code 0 si le chemin y figure comme un mot
-  local p="$1" rest="$2" pre="" avant apres cb ca c2
+# Parent and submodules. A child that has its own kit is not described as kit-less by the
+# parent's map, and the parent's pointer does not lag behind the child's state.
+# Does the path of a submodule appear in the line as a word? A submodule `ops` or `lib`
+# must not be found in "workshops" or "lib.rs" nor in "docs/ops". Before: start of line, or a
+# character that is neither a letter, a digit, nor _ . / -. After: end of line, or a
+# character that is neither a letter, a digit, nor _ -, a final dot remaining allowed.
+# Backticks, spaces, punctuation and the / of a folder therefore bound the path.
+word_in_line() { # <path> <line>: code 0 if the path appears there as a word
+  local p="$1" rest="$2" pre="" before after cb ca c2
   while :; do
     case "$rest" in *"$p"*) ;; *) return 1 ;; esac
-    avant="${rest%%"$p"*}"; apres="${rest#*"$p"}"
-    pre="$pre$avant"
-    cb="${pre: -1}"; ca="${apres:0:1}"; c2="${apres:1:1}"
+    before="${rest%%"$p"*}"; after="${rest#*"$p"}"
+    pre="$pre$before"
+    cb="${pre: -1}"; ca="${after:0:1}"; c2="${after:1:1}"
     case "$cb" in
-      ''|[![:alnum:]_./-]) 
+      ''|[![:alnum:]_./-])
         case "$ca" in
           ''|[![:alnum:]_.-]) return 0 ;;
           .) case "$c2" in ''|[![:alnum:]_]) return 0 ;; esac ;;
         esac ;;
     esac
-    pre="$pre$p"; rest="$apres"
+    pre="$pre$p"; rest="$after"
   done
 }
 
-RE_SANS_KIT="(sans|pas de|aucun|aucune|n'a pas|ne porte pas|ne possede pas|ni )[^|.]{0,40}(kit|pilier|CODEMAP|TODOS|CHANGELOG)|no (own )?kit|without (its|a) own"
+RE_NO_KIT="(sans|pas de|aucun|aucune|n'a pas|ne porte pas|ne possede pas|ni )[^|.]{0,40}(kit|pilier|pillar|CODEMAP|TODOS|CHANGELOG)|no (own )?kit|without (its|a) own|(has|have) no [^|.]{0,40}(kit|pillar)|(lacks|missing) [^|.]{0,40}(kit|pillar)"
 while IFS= read -r p; do
   [ -n "$p" ] || continue
   [ -e "$p/.git" ] || continue
   if [ -f "$p/CODEMAP.md" ] && [ -f "$p/TODOS.md" ] && [ -f "$p/CHANGELOG.md" ]; then
-    contre=""
+    against=""
     while IFS= read -r l; do
       [ -n "$l" ] || continue
       txt="${l#*:}"; txt="${txt#*:}"
-      mot_dans_ligne "$p" "$txt" || continue
-      if grep -qiE "$RE_SANS_KIT" <<<"$txt"; then contre="$l"; break; fi
-    done <<FIN2
+      word_in_line "$p" "$txt" || continue
+      if grep -qiE "$RE_NO_KIT" <<<"$txt"; then against="$l"; break; fi
+    done <<EOT2
 $(grep -nF -- "$p" CODEMAP.md CLAUDE.md 2>/dev/null || true)
-FIN2
-    if [ -n "$contre" ]; then
-      alerte "$p porte son propre kit (CODEMAP, TODOS, CHANGELOG), mais ${contre%%:*} ligne $(printf '%s' "$contre" | cut -d: -f2) dit le contraire. Corriger la carte du parent" "${contre%%:*}"
+EOT2
+    if [ -n "$against" ]; then
+      warn "$p carries its own kit (CODEMAP, TODOS, CHANGELOG), but ${against%%:*} line $(printf '%s' "$against" | cut -d: -f2) says otherwise. Fix the parent's map" "${against%%:*}"
     fi
   fi
-  sha="$(git ls-tree HEAD -- "$p" 2>/dev/null | awk '$2 == "commit" && !vu { print $3; vu = 1 }')"
+  sha="$(git ls-tree HEAD -- "$p" 2>/dev/null | awk '$2 == "commit" && !seen { print $3; seen = 1 }')"
   if [ -n "$sha" ] && git -C "$p" cat-file -e "$sha^{commit}" 2>/dev/null; then
     dptr="$(git -C "$p" show -s --format=%ci "$sha" 2>/dev/null | cut -c1-10)"
     dstat="$(git -C "$p" log -1 --format=%ci -- TODOS.md 2>/dev/null | cut -c1-10)"
     if [ -n "$dptr" ] && [ -n "$dstat" ] && [[ "$dstat" > "$dptr" ]]; then
-      info "$p : le pointeur du parent date du $dptr, le dernier changement de statut de l'enfant (TODOS.md) du $dstat. Avancer le pointeur : git add $p" "$p"
+      info "$p: the parent's pointer is dated $dptr, the child's last state change (TODOS.md) $dstat. Advance the pointer: git add $p" "$p"
     fi
   fi
-done <<FIN
-$SOUS_MODULES
-FIN
+done <<EOT
+$SUBMODULES
+EOT
 
-# Pieges marques. Un piege a un proprietaire : la fiche du module, la carte de sa zone, la
-# carte racine quand il n'y a pas de zone, ou docs/pieges/ pour ceux qui n'ont pas de module.
-# Un piege laisse dans TODOS.md sera perdu avec le bloc de reprise.
-P_FICHE=0; P_ZONE=0; P_RACINE=0; P_PIEGES=0; P_CLAUDE=0; P_TODOS=0; P_AUTRE=0; P_AUTRES=""
-MARQUES="$(find . "${PRUNE[@]}" -o -name '*.md' -exec grep -cHF '🪤' {} + 2>/dev/null | grep -v ':0$' || true)"
+# Marked pitfalls. A pitfall has an owner: the module page, its zone map, the root map when
+# there is no zone, or docs/pitfalls/ for those without a module. A pitfall left in TODOS.md
+# will be lost with the resume block. docs/pieges/ (French name) is read like docs/pitfalls/.
+P_PAGE=0; P_ZONE=0; P_ROOT=0; P_PITFALLS=0; P_CLAUDE=0; P_TODOS=0; P_OTHER=0; P_OTHERS=""
+MARKED="$(find . "${PRUNE[@]}" -o -name '*.md' -exec grep -cHF '🪤' {} + 2>/dev/null | grep -v ':0$' || true)"
 while IFS= read -r l; do
   [ -n "$l" ] || continue
   f="${l%:*}"; f="${f#./}"; c="${l##*:}"
@@ -2148,74 +2134,77 @@ while IFS= read -r l; do
     "$PLANS_DIR"/*) ;;
     TODOS.md) P_TODOS=$((P_TODOS + c)) ;;
     CLAUDE.md) P_CLAUDE=$((P_CLAUDE + c)) ;;
-    CODEMAP.md) P_RACINE=$((P_RACINE + c)) ;;
+    CODEMAP.md) P_ROOT=$((P_ROOT + c)) ;;
     */CODEMAP.md) P_ZONE=$((P_ZONE + c)) ;;
-    "$DOCS_DIR"/pieges/*) P_PIEGES=$((P_PIEGES + c)) ;;
-    "$DOCS_DIR"/modules/*|"$DOCS_DIR"/features/*) P_FICHE=$((P_FICHE + c)) ;;
-    *) P_AUTRE=$((P_AUTRE + c)); P_AUTRES="${P_AUTRES:+$P_AUTRES, }$f" ;;
+    "$DOCS_DIR"/pitfalls/*|"$DOCS_DIR"/pieges/*) P_PITFALLS=$((P_PITFALLS + c)) ;;
+    "$DOCS_DIR"/modules/*|"$DOCS_DIR"/features/*) P_PAGE=$((P_PAGE + c)) ;;
+    *) P_OTHER=$((P_OTHER + c)); P_OTHERS="${P_OTHERS:+$P_OTHERS, }$f" ;;
   esac
-done <<FIN
-$MARQUES
-FIN
-P_TOTAL=$((P_FICHE + P_ZONE + P_RACINE + P_PIEGES + P_CLAUDE + P_TODOS + P_AUTRE))
+done <<EOT
+$MARKED
+EOT
+P_TOTAL=$((P_PAGE + P_ZONE + P_ROOT + P_PITFALLS + P_CLAUDE + P_TODOS + P_OTHER))
 if [ "$P_TOTAL" -gt 0 ]; then
-  info "$P_TOTAL piege(s) marque(s) 🪤 : $P_FICHE en fiche de module, $P_ZONE en carte de zone, $P_RACINE en carte racine, $P_PIEGES dans $DOCS_DIR/pieges/, $P_CLAUDE dans CLAUDE.md, $P_TODOS dans TODOS.md, $P_AUTRE ailleurs"
+  info "$P_TOTAL pitfall(s) marked 🪤: $P_PAGE in a module page, $P_ZONE in a zone map, $P_ROOT in the root map, $P_PITFALLS in $DOCS_DIR/pitfalls/, $P_CLAUDE in CLAUDE.md, $P_TODOS in TODOS.md, $P_OTHER elsewhere"
   if [ "$P_TODOS" -gt 0 ]; then
-    alerte "TODOS.md porte $P_TODOS piege(s) 🪤 sans proprietaire. Un piege va dans la fiche du module, la carte de sa zone, ou $DOCS_DIR/pieges/ s'il n'a pas de module" TODOS.md
+    warn "TODOS.md carries $P_TODOS pitfall(s) 🪤 without an owner. A pitfall goes in the module page, its zone map, or $DOCS_DIR/pitfalls/ if it has no module" TODOS.md
   fi
-  if [ "$P_AUTRE" -gt 0 ]; then
-    info "piege(s) 🪤 hors proprietaire reconnu : $P_AUTRES"
+  if [ "$P_OTHER" -gt 0 ]; then
+    info "pitfall(s) 🪤 outside a recognized owner: $P_OTHERS"
   fi
+fi
+if [ -n "$DOCS_DIR" ] && [ -d "$DOCS_DIR/pitfalls" ]; then
+  info "$DOCS_DIR/pitfalls/: owner of the pitfalls that have no module ($P_PITFALLS marked pitfall(s))"
 fi
 if [ -n "$DOCS_DIR" ] && [ -d "$DOCS_DIR/pieges" ]; then
-  info "$DOCS_DIR/pieges/ : proprietaire des pieges qui n'ont pas de module ($P_PIEGES piege(s) marque(s))"
+  info "$DOCS_DIR/pieges/: owner of the pitfalls that have no module ($P_PITFALLS marked pitfall(s))"
 fi
 
-# Agents du projet. Un `model:` en identifiant fige ne suit pas la derniere version de sa
-# famille, un agent sans `model:` herite du modele de la session principale, souvent Opus.
+# Project agents. A `model:` with a frozen identifier does not follow the latest version of
+# its family, an agent without `model:` inherits the main session's model, often Opus.
 if [ -d .claude/agents ]; then
   nag=0; bad=0
   for a in $(find .claude/agents -maxdepth 1 -type f -name '*.md' 2>/dev/null | LC_ALL=C sort); do
-    if [ -n "$EXCEPTIONS" ] && exception_de agent "$a"; then continue; fi
+    if [ -n "$EXCEPTIONS" ] && exception_of agent "$a"; then continue; fi
     nag=$((nag + 1))
-    m="$(fm_valeur "$a" model)"
+    m="$(fm_value "$a" model)"
     if [ -z "$m" ]; then
       bad=$((bad + 1))
-      alerte "$a : pas de model:, l'agent herite du modele de la session principale, souvent Opus. Poser un alias : haiku, sonnet ou opus" "$a"
+      warn "$a: no model:, the agent inherits the main session's model, often Opus. Set an alias: haiku, sonnet or opus" "$a"
     elif grep -qiE 'claude-.*[0-9]|anthropic\.claude' <<<"$m"; then
       bad=$((bad + 1))
       case "$m" in
         *[Hh]aiku*) al=haiku ;;
         *[Ss]onnet*) al=sonnet ;;
         *[Oo]pus*) al=opus ;;
-        *) al="haiku, sonnet ou opus" ;;
+        *) al="haiku, sonnet or opus" ;;
       esac
-      alerte "$a : model: $m est un identifiant fige, il ne suit pas la derniere version de sa famille. Poser l'alias : $al" "$a"
+      warn "$a: model: $m is a frozen identifier, it does not follow the latest version of its family. Set the alias: $al" "$a"
     fi
   done
-  if [ "$nag" -gt 0 ] && [ "$bad" -eq 0 ]; then ok "$nag agent(s) du projet avec un model: en alias"; fi
+  if [ "$nag" -gt 0 ] && [ "$bad" -eq 0 ]; then ok "$nag project agent(s) with a model: alias"; fi
 fi
 
-fi # fin de la section 11, sautee par --budget
+fi # end of section 11, skipped by --budget
 
-# --- bilan --------------------------------------------------------------------
+# --- summary ------------------------------------------------------------------
 echo
 echo "=============================================="
-if [ "$ALERTES" -eq 0 ]; then
-  echo " Aucune alerte. La doc et le depot sont d'accord, et tout tient dans son budget."
+if [ "$WARNINGS" -eq 0 ]; then
+  echo " No warnings. The docs and the repo agree, and everything fits its budget."
 else
-  echo " $ALERTES alerte(s), dont $BLOCAGES blocage(s). Chacune se termine par une correction,"
-  echo " un deplacement vers archives/, ou une rotation. Un blocage ne se reporte pas."
+  echo " $WARNINGS warning(s), of which $BLOCKERS blocker(s). Each one ends with a fix,"
+  echo " a move to archives/, or a rotation. A blocker is not deferred."
 fi
 echo "=============================================="
 
 if [ "$JSON" -eq 1 ]; then
-  if [ -z "$JSON_BRUT" ]; then
+  if [ -z "$JSON_RAW" ]; then
     printf '[]\n' >&3
   else
-    { printf '[\n'; json_sortie "$JSON_BRUT"; printf ']\n'; } >&3
+    { printf '[\n'; json_output "$JSON_RAW"; printf ']\n'; } >&3
   fi
 fi
 
-if [ "$STRICT" -eq 1 ] && [ "$ALERTES" -gt 0 ]; then exit 1; fi
+if [ "$STRICT" -eq 1 ] && [ "$WARNINGS" -gt 0 ]; then exit 1; fi
 exit 0

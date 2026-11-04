@@ -7,8 +7,8 @@
     {
       "name": "fstack",
       "source": "./",
-      "description": "Une seule stack de contexte pour tous les projets. Convention à trois piliers, clôture et relance de session, plans sourcés, audit des fichiers d'instructions contre le code, migration des anciennes conventions.",
-      "version": "1.0.0-rc.5"
+      "description": "One context stack for every project. Three-pillar convention, session debrief and brief, sourced plans, audit of instruction files against the code, migration of old conventions.",
+      "version": "1.0.0-rc.6"
     }
   ]
 }

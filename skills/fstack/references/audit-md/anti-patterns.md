@@ -1,110 +1,105 @@
-# Les règles qui ne servent à rien
+# Rules that serve no purpose
 
-Chargé en phase 3, pour justifier un `SUPPRIMER` par une raison plutôt que par une impression.
-Chaque forme ci-dessous a la même conséquence : elle coûte des tokens à chaque session et ne
-change rien à ce que fait l'agent.
+Loaded in phase 3, to justify a `DELETE` with a reason rather than a feeling. Each form below has
+the same consequence: it costs tokens every session and changes nothing about what the agent does.
 
-Une règle qui tombe dans une de ces formes n'est pas supprimée d'office. Elle est **proposée** à
-la suppression, avec la raison. L'opérateur tranche.
+A rule that falls into one of these forms is not deleted outright. It is **proposed** for deletion,
+with the reason. The operator decides.
 
-## 1. Ce que l'agent fait déjà par défaut
+## 1. What the agent already does by default
 
-> « Écris du code lisible. » · « Ajoute des commentaires utiles. » · « Gère les erreurs. »
+> "Write readable code." · "Add useful comments." · "Handle errors."
 
-Aucun modèle ne vise l'inverse. La ligne ne déplace rien.
+No model aims for the opposite. The line moves nothing.
 
-**Le test** : est-ce que retirer la ligne changerait une sortie ? Si tu ne vois pas laquelle,
-c'est une suppression.
+**The test**: would removing the line change an output? If you cannot name which, it is a
+deletion.
 
-**L'exception** : quand la règle dit *comment*, elle redevient utile. « Les erreurs remontent en
-`Result`, jamais en exception » est une vraie contrainte.
+**The exception**: when the rule says *how*, it becomes useful again. "Errors bubble up as
+`Result`, never as exceptions" is a real constraint.
 
-## 2. Ce qu'un outil applique déjà
+## 2. What a tool already enforces
 
-> « Indente en 2 espaces. » · « Pas de point-virgule en fin de ligne. » · « Trie les imports. »
+> "Indent with 2 spaces." · "No semicolon at end of line." · "Sort imports."
 
-Si Prettier, Black, `gofmt`, ESLint ou Ruff sont configurés, l'outil gagne toujours, et il gagne
-après l'agent. La ligne est au mieux inutile, au pire elle contredit la config.
+If Prettier, Black, `gofmt`, ESLint or Ruff is configured, the tool always wins, and it wins after
+the agent. The line is useless at best, and at worst it contradicts the config.
 
-**La preuve à donner** : la ligne du fichier de config qui porte la règle.
+**The proof to give**: the config file line that carries the rule.
 
 ```
 .prettierrc:3   "semi": false
 ```
 
-## 3. Ce que le projet dit déjà tout seul
+## 3. What the project already says by itself
 
-> « Ce projet utilise TypeScript. » · « On est en React. » · « La base est en PostgreSQL. »
+> "This project uses TypeScript." · "We're on React." · "The database is PostgreSQL."
 
-L'agent lit le manifeste et l'extension des fichiers. Redire le langage occupe de la place sans
-rien apprendre.
+The agent reads the manifest and the file extensions. Restating the language takes space and
+teaches nothing.
 
-**L'exception** : une contrainte de version qui n'est pas dans le manifeste, « on reste sur React
-18, la 19 casse le rendu serveur ici », est une information réelle. Elle reste, et elle part
-souvent en fiche `docs/`.
+**The exception**: a version constraint that is not in the manifest, "we stay on React 18, 19
+breaks server rendering here", is real information. It stays, and often moves to a `docs/` page.
 
-## 4. Trop vague pour être suivi
+## 4. Too vague to follow
 
-> « Sois rigoureux. » · « Fais attention aux performances. » · « Respecte les bonnes pratiques. »
+> "Be rigorous." · "Mind performance." · "Follow best practices."
 
-Deux personnes qui lisent la ligne font deux choses différentes, donc elle ne coordonne rien.
+Two people reading the line do two different things, so it coordinates nothing.
 
-**Le test** : est-ce que tu peux dire, en lisant un diff, si la règle a été respectée ? Non, c'est
-une suppression. Une règle non vérifiable n'est pas une règle.
+**The test**: can you tell, reading a diff, whether the rule was followed? No means deletion. A
+rule that cannot be checked is not a rule.
 
-## 5. Le négatif sans alternative
+## 5. The negative with no alternative
 
-> « N'utilise pas `any`. » · « Ne fais pas de requête dans la boucle de rendu. »
+> "Don't use `any`." · "Don't query inside the render loop."
 
-Un interdit sans remplaçant laisse l'agent trouver tout seul, et il trouve souvent pire. La règle
-n'est pas fausse, elle est incomplète.
+A ban with no replacement leaves the agent to find its own way, and it often finds worse. The rule
+is not wrong, it is incomplete.
 
-**Attention**, et c'est le piège de cette catégorie : **tu ne complètes pas la règle toi-même.**
-Compléter, c'est inventer. Tu la signales à l'opérateur en phase 4, avec la question « par quoi on
-remplace ». S'il ne répond pas, elle reste telle quelle.
+**Careful**, this is the trap of the category: **you do not complete the rule yourself.**
+Completing means inventing. You flag it to the operator in phase 4, with the question "what do we
+replace it with". If they do not answer, it stays as it is.
 
-## 6. La politesse et le méta
+## 6. Politeness and meta
 
-> « Merci de bien vouloir... » · « N'hésite pas à poser des questions. » · « Tu es un expert
-> développeur senior. »
+> "Please kindly..." · "Feel free to ask questions." · "You are a senior developer expert."
 
-Le rôle et le ton se règlent ailleurs. Dans un fichier d'instructions de projet, ces lignes ne
-portent aucune information sur le projet.
+Role and tone are set elsewhere. In a project instructions file, these lines carry no information
+about the project.
 
-## 7. La documentation déguisée
+## 7. Documentation in disguise
 
-> Vingt lignes qui décrivent l'architecture du projet, la liste des dossiers, l'historique des
-> refontes.
+> Twenty lines describing the project architecture, the folder list, the history of rewrites.
 
-C'est utile, mais ce n'est pas une instruction. Ça ne va pas en `SUPPRIMER`, ça va en `DOC`, ou
-dans un `CODEMAP.md` si le projet en a un. Cette forme est la première cause d'un fichier racine
-à 400 lignes.
+Useful, but not an instruction. It does not go to `DELETE`, it goes to `DOC`, or into a
+`CODEMAP.md` if the project has one. This form is the first cause of a 400-line root file.
 
-## 8. La règle morte
+## 8. The dead rule
 
-> Une règle dont le `paths:` ne matche aucun fichier. Une consigne sur un dossier supprimé. Un
-> chemin qui n'existe plus.
+> A rule whose `paths:` matches no file. An instruction about a deleted folder. A path that no
+> longer exists.
 
-C'est un `FAUX` de la phase 2. Selon qu'elle explique quelque chose du code actuel ou pas, elle
-part en `ARCHIVE` ou en `SUPPRIMER`.
+It is a `FALSE` from phase 2. Depending on whether it explains something about the current code,
+it goes to `ARCHIVE` or `DELETE`.
 
-**La preuve à donner** : la sortie du script.
+**The proof to give**: the script output.
 
 ```
-FAUX  glob  L42  src/legacy/**/*.js  ne matche aucun fichier
+FALSE  glob  L42  src/legacy/**/*.js  matches no file
 ```
 
-## Le tableau des raisons, pour le rapport
+## The reasons table, for the report
 
-Une suppression se justifie par une des raisons ci-dessous, jamais par « inutile ».
+A deletion is justified by one of the reasons below, never by "useless".
 
-| Code | Raison courte |
+| Code | Short reason |
 |---|---|
-| `defaut` | comportement déjà par défaut |
-| `outil` | déjà appliqué par un linter ou un formateur |
-| `evident` | déjà porté par le langage ou le manifeste |
-| `vague` | non vérifiable dans un diff |
-| `negatif` | interdit sans remplaçant, non complété par l'opérateur |
-| `meta` | politesse, rôle, hors sujet projet |
-| `mort` | référence cassée, sans valeur de trace |
-| `doublon` | dit ailleurs, dans le même fichier ou dans une fiche |
+| `default` | behavior already the default |
+| `tool` | already enforced by a linter or formatter |
+| `obvious` | already carried by the language or the manifest |
+| `vague` | cannot be checked in a diff |
+| `negative` | ban with no replacement, not completed by the operator |
+| `meta` | politeness, role, off-topic for the project |
+| `dead` | broken reference, no value as a trace |
+| `duplicate` | said elsewhere, in the same file or on a page |

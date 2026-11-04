@@ -1,44 +1,44 @@
 # TODOS, {{PROJECT_NAME}}
 
-> Quoi maintenant. Ce fichier ne garde que le futur. Ce qui est fait disparaît d'ici et vit
-> au CHANGELOG.
+> What now. This file keeps only the future. What is done leaves here and lives in the
+> CHANGELOG.
 
-## 🔄 État à la reprise, {{DATE}}
+## 🔄 Resume state, {{DATE}}
 
-<!-- Bloc RÉÉCRIT à chaque clôture depuis l'état courant, jamais empilé. Quarante lignes au
-     plus. C'est ce qui est lu en premier après un redémarrage à froid, il doit suffire à
-     reprendre sans poser de question. Ce qui en sort a un propriétaire : un événement est déjà au
-     CHANGELOG, un piège va dans sa fiche ou sa carte de zone, une tâche va dans la liste plus
-     bas, une décision en ADR. Le récit ne se garde pas. -->
+<!-- Block REWRITTEN at every debrief from the current state, never stacked. Forty lines at
+     most. It is the first thing read after a cold restart, and it must be enough to resume
+     without asking a question. What leaves it has an owner: an event is already in the
+     CHANGELOG, a pitfall goes in its page or its zone map, a task goes in the list below, a
+     decision goes in an ADR. The story is not kept. -->
 
-**Où on en est** : <2 à 4 lignes factuelles, ce qui marche, ce qui est en place>
+**Where we are**: <2 to 4 factual lines, what works, what is in place>
 
-**En cours** : <la tâche entamée et pas finie, avec les fichiers concernés, ou « rien »>
+**In progress**: <the task started and not finished, with the files involved, or "nothing">
 
-**Prochaine étape** : <la toute prochaine action concrète, quel fichier tu ouvres, quoi faire>
+**Next step**: <the very next concrete action, which file you open, what to do>
 
-**À savoir avant de toucher** : <état instable, travail à moitié appliqué, piège du moment>
+**To know before touching**: <unstable state, half-applied work, the pitfall of the moment>
 
-**Vérifier le terrain** : `git log --oneline -10 && git status -s` <remplacer par la commande qui prouve l'état annoncé ci-dessus : tests, build ou script de contrôle>
+**Check the terrain**: `git log --oneline -10 && git status -s` <replace with the command that proves the state announced above: tests, build or check script>
 
 ---
 
-<!-- Pas de section « ce que cette session a produit », c'est du CHANGELOG. Pas de case cochée,
-     une tâche faite se supprime. Pas de section « décidé », une décision va en ADR ou nulle part.
-     Fichier entier : cible 150 lignes. -->
+<!-- No "what this session produced" section, that is CHANGELOG. No ticked box, a finished task
+     is deleted. No "decided" section, a decision goes in an ADR or nowhere.
+     Whole file: aim for 150 lines. -->
 
-## 🔴 Bloqué
+## 🔴 Blocked
 
-- [ ] <tâche>, bloquée par <quoi>, à débloquer en <comment>
+- [ ] <task>, blocked by <what>, to unblock by <how>
 
-## 🎯 Prochaines étapes
+## 🎯 Next steps
 
-- [ ] <verbe à l'infinitif, plus une zone concrète : fichier, module ou commande>
+- [ ] <verb in the imperative, plus a concrete area: file, module or command>
 
-## 🧹 Dette et améliorations
+## 🧹 Debt and improvements
 
-- [ ] <ce qu'on sait imparfait>, impact : <pourquoi ça compte>
+- [ ] <what we know is imperfect>, impact: <why it matters>
 
-## 💡 Idées non engagées
+## 💡 Uncommitted ideas
 
-- <à purger sans état d'âme si ça ne prend pas>
+- <purge without regret if it does not catch on>

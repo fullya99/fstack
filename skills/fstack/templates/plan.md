@@ -1,134 +1,134 @@
-# <titre court du plan>
+# <short plan title>
 
-<!-- Slug de fichier : plans/<slug>.md, minuscules et tirets. -->
+<!-- File slug: plans/<slug>.md, lowercase and dashes. -->
 
-## Objectif et cas de validation
+## Goal and validation case
 
-<!-- Le résultat en une phrase, et la chose observable qui dira que c'est fini. -->
+<!-- The result in one sentence, and the observable thing that will say it is done. -->
 
-<phrase d'objectif>
+<goal sentence>
 
-**Validation** : <observation ou commande qui prouve que c'est fait>
+**Validation**: <observation or command that proves it is done>
 
-## Décisions verrouillées
+## Locked decisions
 
-<!-- Numérotées, une justification en une ligne chacune. Ne pas rouvrir en cours d'exécution. -->
+<!-- Numbered, one-line justification each. Do not reopen during execution. -->
 
-1. <décision> : <justification>
-2. <décision> : <justification>
+1. <decision>: <justification>
+2. <decision>: <justification>
 
-## Ce qu'on ne touche pas
+## What we do not touch
 
-<!-- Fichiers, modules, comportements hors d'atteinte. Explicite, pas de sous-entendu. -->
+<!-- Files, modules, behaviors out of reach. Explicit, nothing implied. -->
 
-- <chemin ou comportement>
+- <path or behavior>
 
-## Recherche
+## Research
 
-<!-- Ce qui a façonné la conception, un lien et une date par point. -->
-<!-- Si la tâche n'avait pas de surface externe, écrire la phrase telle quelle et rien d'autre. -->
+<!-- What shaped the design, one link and one date per point. -->
+<!-- If the task had no external surface, write the sentence as is and nothing else. -->
 
-- <affirmation> : <lien>, <date>
+- <claim>: <link>, <date>
 
-Ou : cette tâche n'a pas de surface externe, aucune recherche menée.
+Or: this task has no external surface, no research done.
 
-## État actuel
+## Current state
 
-<!-- Chemins et symboles réels dont le travail part. Aucun placeholder abstrait. -->
+<!-- Real paths and symbols the work starts from. No abstract placeholder. -->
 
-- <chemin réel> : <ce qui s'y trouve aujourd'hui>
+- <real path>: <what is there today>
 
 ## Invariants
 
-<!-- Ce qui doit rester vrai à chaque étape : tests qui passent, pas de secret sur disque,
-     compatibilité ascendante, contraintes imposées par le projet. -->
+<!-- What must stay true at every step: passing tests, no secret on disk,
+     backward compatibility, constraints imposed by the project. -->
 
 - <invariant>
 
-## Portes préalables
+## Prior gates
 
-<!-- Trois questions tranchées par écrit avant la conception. Une porte forcée va au registre
-     des écarts, jamais en silence. -->
+<!-- Three questions settled in writing before the design. A forced gate goes to the deviation
+     log, never silently. -->
 
-- **Simplicité** : une version plus petite règle-t-elle le vrai besoin ? <réponse>
-- **Anti-abstraction** : ajoute-t-on une couche que rien n'exige aujourd'hui ? <réponse>
-- **Intégration d'abord** : le bout en bout marche-t-il avant qu'on peaufine une partie ? <réponse>
+- **Simplicity**: does a smaller version solve the real need? <answer>
+- **Anti-abstraction**: are we adding a layer nothing requires today? <answer>
+- **Integration first**: does end to end work before we polish one part? <answer>
 
-## Registre des écarts
+## Deviation log
 
-<!-- Ce qu'on s'est autorisé contre une porte préalable, et pourquoi. Vide si rien n'a été forcé. -->
+<!-- What we allowed ourselves against a prior gate, and why. Empty if nothing was forced. -->
 
-- <écart> : <raison>
+- <deviation>: <reason>
 
-## Conception
+## Design
 
-<!-- Les changements, fichier par fichier. -->
+<!-- The changes, file by file. -->
 
-### <fichier ou zone>
+### <file or area>
 
-<ce qui change et pourquoi>
+<what changes and why>
 
-## Tâches
+## Tasks
 
-<!-- Une entrée par tâche, ce format tel quel. -->
+<!-- One entry per task, this format as is. -->
 
-### Tâche 1, <nom court>
+### Task 1, <short name>
 
-**Fichiers**
-- créer : <chemins exacts>
-- modifier : <chemins exacts>
-- tester : <chemins exacts>
+**Files**
+- create: <exact paths>
+- modify: <exact paths>
+- test: <exact paths>
 
 **Interfaces**
-- consomme : <signatures exactes>
-- produit : <signatures exactes>
+- consumes: <exact signatures>
+- produces: <exact signatures>
 
-**Étapes**
-- [ ] <une action vérifiable, deux à cinq minutes>
+**Steps**
+- [ ] <one verifiable action, two to five minutes>
 - [ ] <...>
 
-**Vérification** : <la commande ou l'observation qui dit que la tâche est finie>
+**Verification**: <the command or observation that says the task is done>
 
-## Découpage pour l'équipe
+## Team split
 
-<!-- Quels lots partent en parallèle. Lesquels sont sériels, et pourquoi. Deux lots qui touchent
-     les mêmes fichiers ne partent jamais ensemble. -->
+<!-- Which batches run in parallel. Which are serial, and why. Two batches touching
+     the same files never start together. -->
 
-<!-- Un rôle par lot, pris dans `references/DELEGATION.md` : explorateur, controleur, executant, developpeur,
-     chercheur, expert ou relecteur. Le plus bas qui tient le critère de fin du lot. -->
+<!-- One role per batch, taken from `references/DELEGATION.md`: explorer, tester, runner, builder,
+     researcher, expert or reviewer. The lowest one that meets the batch's end criterion. -->
 
-- Lot A (<tâches>), rôle <rôle> : parallèle avec <lot ou rien>
-- Lot B (<tâches>), rôle <rôle> : après <lot>, parce que <raison>
+- Batch A (<tasks>), role <role>: parallel with <batch or nothing>
+- Batch B (<tasks>), role <role>: after <batch>, because <reason>
 
-## Contre-revue
+## Counter-review
 
-<!-- Un relecteur en contexte neuf challenge les hypothèses du plan. Une décision écrite par constat,
-     sans quoi le plan ne se rend pas. -->
+<!-- A fresh-context reviewer challenges the plan's assumptions. One written decision per finding,
+     without which the plan is not returned. -->
 
-| Id | Niveau | Constat et source | Décision |
+| Id | Level | Finding and source | Decision |
 |---|---|---|---|
-| F-01 | Bloquant, Majeur ou Modéré | <ce qui est faux, lien> | intégré (<section>) ou rejeté (<raison>) |
+| F-01 | Blocker, Major or Moderate | <what is wrong, link> | integrated (<section>) or rejected (<reason>) |
 
-Validé : <constats confirmés par une source primaire, en une ligne>
+Validated: <findings confirmed by a primary source, in one line>
 
-## Hors périmètre et différé
+## Out of scope and deferred
 
-<!-- Ce qu'on a choisi de ne pas faire ici, et pourquoi ça peut attendre. -->
+<!-- What we chose not to do here, and why it can wait. -->
 
 - <point>
 
-## Risques et pièges connus
+## Known risks and pitfalls
 
-<!-- Ce qui a des chances de mal tourner, tiré de la recherche ou de l'exploration. -->
+<!-- What is likely to go wrong, drawn from research or exploration. -->
 
-- <risque> : <comment le repérer ou l'éviter>
+- <risk>: <how to spot or avoid it>
 
-## Reprise
+## Restart notes
 
-<!-- De quoi redémarrer dans une session qui ne sait rien. Se met à jour au fil de l'exécution,
-     jamais figée à l'écriture du plan. -->
+<!-- Enough to restart in a session that knows nothing. Updated as execution goes,
+     never frozen when the plan is written. -->
 
-- État actuel : <phrase>
-- Prochaine tâche : <numéro et nom de la tâche>
-- Déjà validé, ne pas refaire : <liste>
-- Commande d'état du terrain : <commande tests, lint, git status>
+- Current state: <sentence>
+- Next task: <task number and name>
+- Already validated, do not redo: <list>
+- Terrain check command: <tests, lint, git status command>

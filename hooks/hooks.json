@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/fstack/scripts/ctx-demarrage.sh\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/fstack/scripts/ctx-startup.sh\"",
             "timeout": 10
           }
         ]

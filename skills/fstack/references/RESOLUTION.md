@@ -1,45 +1,42 @@
-# RESOLUTION : pourquoi la boucle `$SKILL` cherche là, dans cet ordre
+# RESOLUTION: why the `$SKILL` loop looks there, in that order
 
-Lis cette page quand la boucle rend vide alors que le skill est installé sur la machine, ou
-quand elle résout une version qui n'est pas la bonne.
+Read this page when the loop returns empty although the skill is installed on the machine, or
+when it resolves the wrong version.
 
-## L'ordre des candidats
+## The candidate order
 
-L'ordre est voulu. `CLAUDE_PLUGIN_ROOT` d'abord quand le skill tourne comme plugin, puis la
-portée projet chez Claude Code et chez Codex, puis la portée utilisateur des deux, puis les
-copies de plugin de Claude Code.
+The order is deliberate. `CLAUDE_PLUGIN_ROOT` first when the skill runs as a plugin, then the
+project scope in Claude Code and in Codex, then the user scope of both, then Claude Code's plugin
+copies.
 
-## Les deux répertoires utilisateur de Codex
+## Codex's two user directories
 
-Codex a deux répertoires de portée utilisateur, `~/.codex/skills/` où son installeur dépose, et
-`~/.agents/skills/` du standard ouvert. Les deux sont scannés, vérifié le 2026-08-14. Le premier
-passe avant parce qu'il porte la version que l'utilisateur a réellement installée, quand l'autre
-peut garder une copie posée à la main et devenue vieille.
+Codex has two user-scope directories, `~/.codex/skills/` where its installer drops files, and
+`~/.agents/skills/` from the open standard. Both are scanned, verified on 2026-08-14. The first
+comes first because it holds the version the user actually installed, while the other may keep a
+hand-placed copy that has gone stale.
 
-## Les deux copies d'un plugin Claude Code
+## The two copies of a Claude Code plugin
 
-Un plugin installé existe en deux copies. `cache/<marketplace>/<plugin>/<version>/` porte la
-version réellement installée, `marketplaces/<marketplace>/` porte la pointe de `master` du
-dépôt. On cherche le cache d'abord, et le `sort -r` prend la version la plus haute quand
-plusieurs sont en cache. Sans cet ordre, un `find` unique renvoie les deux et prend celle que le
-parcours donne en premier, ce qui choisit au hasard dès que le dépôt a avancé au-delà de la
-version installée.
+An installed plugin exists in two copies. `cache/<marketplace>/<plugin>/<version>/` holds the
+version actually installed, `marketplaces/<marketplace>/` holds the tip of the repo's `master`.
+The cache is searched first, and `sort -r` takes the highest version when several are cached.
+Without that order, a single `find` returns both and takes whichever the traversal yields first,
+which picks at random as soon as the repo has moved past the installed version.
 
-Le test porte sur la présence de `scripts/ctx-audit.sh`, ce qui écarte au passage les
-répertoires homonymes.
+The test looks for `scripts/ctx-audit.sh`, which also rules out same-named directories.
 
-## La remontée des ancêtres
+## Climbing the ancestors
 
-Codex n'a pas d'équivalent de `CLAUDE_PLUGIN_ROOT`, cette boucle est son seul mécanisme de
-résolution. Il remonte l'arborescence pour trouver `.agents/skills/`, et `$ANCETRES` fait la
-même chose avant la boucle, en testant chaque ancêtre du répertoire courant. Un skill posé à la
-racine d'un dépôt pendant qu'on travaille dans un sous-dossier est donc trouvé. Vérifié sur un
-banc d'essai Codex du 2026-08-14.
+Codex has no equivalent of `CLAUDE_PLUGIN_ROOT`, this loop is its only resolution mechanism. It
+climbs the tree to find `.agents/skills/`, and `$ANCESTORS` does the same before the loop, testing
+each ancestor of the current directory. A skill placed at a repo root while you work in a
+subfolder is therefore found. Verified on a Codex test bench on 2026-08-14.
 
-## Symptôme, cause, geste
+## Symptom, cause, action
 
-| Symptôme | Cause probable | Ce qu'on fait |
+| Symptom | Likely cause | What to do |
 |---|---|---|
-| Boucle vide en installation plugin | `CLAUDE_PLUGIN_ROOT` non posé | on passe par la portée utilisateur |
-| Vieille version résolue | le clone du marketplace a gagné sur le cache | on relance `claude plugin update` |
-| Codex ne trouve rien | le skill est dans `~/.claude/skills` et pas dans `~/.agents/skills` | on copie |
+| Empty loop on a plugin install | `CLAUDE_PLUGIN_ROOT` not set | go through the user scope |
+| Old version resolved | the marketplace clone won over the cache | rerun `claude plugin update` |
+| Codex finds nothing | the skill is in `~/.claude/skills` and not in `~/.agents/skills` | copy it |

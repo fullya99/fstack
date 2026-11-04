@@ -1,59 +1,57 @@
-# CONVENTION : spécification des 3 piliers
+# CONVENTION: specification of the 3 pillars
 
-> Référence détaillée. Le résumé opérationnel est dans `SKILL.md`.
-> Tout ce que tu écris ici suit la règle du skill `style-redaction`.
+> Detailed reference. The operating summary is in `SKILL.md`.
+> Everything you write here follows the `style-redaction` skill rule.
 
-## Le principe : une question par fichier
+## The principle: one question per file
 
-Si la doc pourrit, c'est rarement parce qu'on écrit trop peu. C'est parce qu'on demande à un
-seul fichier de faire plusieurs métiers. Il devient un mur d'exceptions que plus personne ne
-lit, donc que plus personne ne met à jour.
+When docs rot, it is rarely because too little was written. It is because one file was asked to do
+several jobs. It becomes a wall of exceptions nobody reads, so nobody updates it.
 
-La convention répartit la connaissance selon la question à laquelle elle répond, et selon sa
-durée de vie.
+The convention splits knowledge by the question it answers and by its lifespan.
 
-| Surface | Question | Durée de vie | Chargement |
+| Surface | Question | Lifespan | Loading |
 |---|---|---|---|
-| `CLAUDE.md` ou `AGENTS.md` | Comment on travaille ici ? | Très stable | Toujours, automatique |
-| `CODEMAP.md` | Où ça se trouve ? | Stable, évolue avec la structure | À la reprise |
-| `TODOS.md` | Quoi maintenant ? | Volatile | À la reprise |
-| `CHANGELOG.md` | Qu'est-ce qui a changé ? | Append-only | 2 ou 3 entrées à la reprise |
-| `docs/` | Comment ça marche en détail ? | Longue, mais datée | À la demande, ciblé |
-| `archives/` | Qu'est-ce qui était vrai avant ? | Figée | Jamais, sauf archéologie |
+| `CLAUDE.md` or `AGENTS.md` | How do we work here? | Very stable | Always, automatic |
+| `CODEMAP.md` | Where is it? | Stable, follows the structure | On resume |
+| `TODOS.md` | What now? | Volatile | On resume |
+| `CHANGELOG.md` | What changed? | Append-only | 2 or 3 entries on resume |
+| `docs/` | How does it work in detail? | Long, but dated | On demand, targeted |
+| `archives/` | What was true before? | Frozen | Never, except archaeology |
 
-Corollaire : ne mets jamais la même information dans deux surfaces. Une info dupliquée est une
-info qui va diverger. Tu mets un pointeur, pas une copie.
+Corollary: never put the same information in two surfaces. Duplicated information will diverge.
+Write a pointer, not a copy.
 
-Il n'y a **pas de fichier de mémoire** dans cette convention, et ce n'est pas un oubli. Un
-fichier dont la définition est « ce que le code ne dit pas » se remplit de tout, et recopie ce
-que les autres surfaces portent déjà. Chaque savoir a donc un propriétaire unique.
+There is **no memory file** in this convention, and it is not an oversight. A file defined as "what
+the code does not say" fills up with everything and copies what the other surfaces already carry.
+Each piece of knowledge has a single owner.
 
-| Ce que tu as appris | Où ça va |
+| What you learned | Where it goes |
 |---|---|
-| Décision et son pourquoi | `docs/decisions/ADR-NNNN-*.md` |
-| Piège d'un module | La fiche du module, ou la carte de sa zone `<zone>/CODEMAP.md` |
-| Une piste écartée et pourquoi | L'ADR de la décision, ou les pièges de la fiche |
-| Piège sans module identifiable et sans zone | `docs/pieges/` si le projet en a un, sinon la section zones sensibles de `CODEMAP.md`, jamais les deux dans un même projet |
-| Préférence durable de l'utilisateur | `CLAUDE.md` |
-| Contrainte d'environnement, accès, outil disponible | `CODEMAP.md`, section dépendances |
-| Fait externe daté et périssable | `docs/veille/`, ou une entrée de `CHANGELOG.md` |
+| A decision and its why | `docs/decisions/ADR-NNNN-*.md` |
+| A module pitfall | The module page, or the map of its zone `<zone>/CODEMAP.md` |
+| A discarded lead and why | The decision's ADR, or the page's pitfalls |
+| A pitfall with no identifiable module and no zone | `docs/pitfalls/` if the project has one (`docs/pieges/` of an older project is also read), otherwise the sensitive zones section of `CODEMAP.md`, never both in one project |
+| A lasting user preference | `CLAUDE.md` |
+| Environment constraint, access, available tool | `CODEMAP.md`, dependencies section |
+| A dated, perishable external fact | `docs/radar/`, or a `CHANGELOG.md` entry |
 
-Le test à l'écriture tient en une question : **qui est propriétaire de cette phrase ?** Si tu ne
-sais pas répondre, c'est presque toujours qu'elle n'a pas besoin d'être écrite.
+The test when writing is one question: **who owns this sentence?** If you cannot answer, it almost
+always does not need to be written.
 
-Attention à un homonyme. Claude Code tient sa propre mémoire automatique dans un fichier nommé
-`MEMORY.md`, sous `~/.claude/projects/<projet>/memory/`. Il est local à la machine, il ne survit
-ni à un clone ni à un changement de poste, et il ne fait pas partie de cette convention. Ne le
-commite pas. La clôture le draine vers les propriétaires (voir `MEMOIRE-AUTO.md`), et rien ne
-s'écrit du dépôt vers lui. Le dépôt fait autorité.
+Beware of a namesake. Claude Code keeps its own automatic memory in a file named `MEMORY.md`, under
+`~/.claude/projects/<project>/memory/`. It is local to the machine, survives neither a clone nor a
+change of workstation, and is not part of this convention. Do not commit it. The debrief drains it
+toward the owners (see `AUTO-MEMORY.md`), and nothing is written from the repo into it. The repo
+is the authority.
 
 ---
 
-## Emplacement et adaptation
+## Location and adaptation
 
-Le bloc en tête de `CODEMAP.md` déclare les chemins réels du projet. Ça rend la convention
-auto-descriptive. Un projet qui utilise `documentation/` au lieu de `docs/` le déclare, et
-tout le reste suit.
+The block at the top of `CODEMAP.md` declares the project's real paths. This makes the convention
+self-describing. A project that uses `documentation/` instead of `docs/` declares it, and
+everything else follows.
 
 ```html
 <!-- contexte:convention
@@ -66,215 +64,213 @@ langue: fr
 -->
 ```
 
-Sans ce bloc, on suppose les chemins par défaut ci-dessus. La ligne `version` est la seule
-obligatoire, elle fait refuser un bloc trop récent aux scripts trop anciens. La taille du projet
-ne s'écrit plus, l'audit la calcule en nombre de fichiers hors dépendances : petite sous 150,
-moyenne jusqu'à 600, grande au-delà. Les autres clés (seuils, journal, exceptions) et leurs
-défauts sont dans `references/CONFIG-PROJET.md`.
+The block, its keys and their values stay in French in every project. Without the block, the
+default paths above are assumed. The `version` line is the only required one, it makes scripts that
+are too old refuse a block that is too recent. Project size is no longer written, the audit
+computes it from the file count outside dependencies: small under 150, medium up to 600, large
+beyond. The other keys (thresholds, log, exceptions) and their defaults are in
+`references/PROJECT-CONFIG.md`.
 
-**Ce que la stack parcourt.** La gestion de contexte ne s'arrête jamais à ce que git suit : un
-fichier gitignoré (notes locales, `context-input/`, livrables, `CLAUDE.local.md`) reste du
-contexte, la liste des fichiers ne vient donc jamais de `git ls-files` et rien n'est exclu parce
-que le `.gitignore` l'exclut. Seul le généré lourd s'élague, reconnu à sa nature : une liste fixe
-de dossiers, les dossiers qui portent un `CACHEDIR.TAG`, les dossiers d'un moteur de jeu quand son
-marqueur existe, à la racine ou jusqu'à trois niveaux plus bas. Tout élagage est nommé par l'audit, jamais silencieux. Un fichier
-gitignoré compte donc, mais il ne voyage ni vers un collègue ni vers une autre machine : l'audit
-l'annonce en information. `ignorer:` écarte ce que git suit sans qu'il fasse partie du projet.
+**What the stack walks.** Context management never stops at what git tracks: a gitignored file
+(local notes, `context-input/`, deliverables, `CLAUDE.local.md`) is still context, so the file list
+never comes from `git ls-files` and nothing is excluded because `.gitignore` excludes it. Only
+heavy generated output is pruned, recognised by its nature: a fixed list of directories,
+directories carrying a `CACHEDIR.TAG`, game engine directories when their marker exists, at the
+root or up to three levels down. Every pruning is named by the audit, never silent. A gitignored
+file therefore counts, but it travels to neither a colleague nor another machine: the audit
+reports it as information. `ignorer:` sets aside what git tracks without being part of the project.
 
-Sur une codebase moyenne ou grande, la carte se découpe par zones. Une zone est un répertoire qui
-porte la sienne, `<zone>/CODEMAP.md`. L'état et le journal restent uniques à la racine. Le détail
-est dans `references/ZONES.md`.
+On a medium or large codebase, the map is split by zones. A zone is a directory that carries its
+own map, `<zone>/CODEMAP.md`. State and log stay single, at the root. Details are in
+`references/ZONES.md`.
 
-**Multi-niveaux** : chaque unité autonome (racine, package d'un monorepo, sous-projet) a son
-propre kit. Le parent ne recopie pas le contenu des enfants, il les liste et pointe vers eux.
-Une session qui touche plusieurs niveaux les met tous à jour.
-
----
-
-## CODEMAP.md, la carte
-
-**Rôle** : trouver le bon fichier en une lecture, et comprendre ce qui casse quand on le
-modifie. Ce fichier n'est ni une doc d'API ni un tutoriel.
-
-**Ce qu'on y met**
-
-1. Le bloc `contexte:convention`, profil et chemins.
-2. **Une phrase** qui dit ce que fait le projet. Un lecteur qui ne connaît rien doit pouvoir
-   décider en dix secondes s'il est au bon endroit.
-3. **Arborescence commentée.** Les répertoires qui comptent, une ligne de rôle chacun. Pas de
-   sortie brute de `tree`. Tu cites ce qui porte du sens, tu omets le bruit (dépendances,
-   builds, caches).
-4. **Modules.** Un tableau avec le nom, le chemin, le rôle en une ligne et la fiche `docs/`
-   si elle existe.
-5. **Points d'entrée.** Par où le code démarre vraiment : main, serveur, CLI, handler, cron,
-   worker. C'est ce qu'on cherche en premier et qu'on trouve le moins vite.
-6. **Flux principal.** Le chemin nominal d'une requête ou d'un traitement, en trois à six
-   étapes, avec les fichiers traversés. Rien ne remplace ça pour un lecteur à froid.
-7. **Dépendances externes.** Services, API, bases, files, comptes. Tout ce dont le projet a
-   besoin pour tourner. **Jamais de secret** : tu dis où est la clé, pas ce qu'elle vaut.
-8. **Commandes.** Install, run, test, lint, build, deploy. Les vraies, celles que tu as testées.
-9. **Zones sensibles.** Code généré à ne pas éditer, fichiers à ne toucher qu'avec précaution,
-   conventions non évidentes. Racine : seulement ce qui n'a ni zone ni fiche. Ce qui concerne une
-   zone descend dans `<zone>/CODEMAP.md`.
-10. **Zones.** Une table qui liste les zones du projet et pointe vers leur carte, sans recopier.
-11. La date de dernière mise à jour.
-
-**Ce qui n'y va pas** : l'historique (CHANGELOG), les tâches (TODOS), le pourquoi des décisions
-(`docs/decisions/`), les détails d'implémentation (`docs/modules/`).
-
-**Longueur visée** : cible 250 lignes, alerte à 300, blocage à 400. Ce qui déborde descend dans
-une carte de zone, voir `references/ZONES.md`.
+**Multi-level**: each self-contained unit (root, monorepo package, sub-project) has its own kit.
+The parent does not copy the children's content, it lists them and points to them. A session that
+touches several levels updates all of them.
 
 ---
 
-## TODOS.md, l'état de reprise
+## CODEMAP.md, the map
 
-**Rôle** : c'est le fichier qui rend le `/clear` sans danger. Il porte à la fois ce qu'il reste
-à faire, et où on en était exactement.
+**Role**: find the right file in one read, and understand what breaks when you change it. This
+file is neither API documentation nor a tutorial.
 
-**Structure imposée**
+**What goes in it**
+
+1. The `contexte:convention` block, profile and paths.
+2. **One sentence** saying what the project does. A reader who knows nothing must be able to
+   decide in ten seconds whether they are in the right place.
+3. **Annotated tree.** The directories that matter, one role line each. No raw `tree` output.
+   Cite what carries meaning, omit the noise (dependencies, builds, caches).
+4. **Modules.** A table with the name, the path, the role in one line and the `docs/` page if
+   there is one.
+5. **Entry points.** Where the code really starts: main, server, CLI, handler, cron, worker. It
+   is what you look for first and find last.
+6. **Main flow.** The nominal path of a request or a job, in three to six steps, with the files
+   crossed. Nothing replaces this for a cold reader.
+7. **External dependencies.** Services, APIs, databases, queues, accounts. Everything the project
+   needs to run. **Never a secret**: say where the key is, not what it is worth.
+8. **Commands.** Install, run, test, lint, build, deploy. The real ones, the ones you tested.
+9. **Sensitive zones.** Generated code not to edit, files to touch with care, non-obvious
+   conventions. Root: only what has neither a zone nor a page. What concerns a zone goes down into
+   `<zone>/CODEMAP.md`.
+10. **Zones.** A table listing the project's zones and pointing to their map, without copying.
+11. The date of the last update.
+
+**What does not go in it**: history (CHANGELOG), tasks (TODOS), the why of decisions
+(`docs/decisions/`), implementation details (`docs/modules/`).
+
+**Target length**: target 250 lines, warning at 300, blocker at 400. What overflows goes down into
+a zone map, see `references/ZONES.md`.
+
+---
+
+## TODOS.md, the resume state
+
+**Role**: this is the file that makes `/clear` safe. It carries both what remains to do and
+exactly where we stood.
+
+**Required structure**
 
 ```markdown
-# TODOS, <projet>
+# TODOS, <project>
 
-## 🔄 État à la reprise, AAAA-MM-JJ
-**Où on en est** : <2 à 4 lignes factuelles, ce qui marche, ce qui est en place>
-**En cours** : <la tâche entamée et pas finie, avec les fichiers concernés, ou « rien »>
-**Prochaine étape** : <la toute prochaine action concrète, pas un objectif vague>
-**À savoir avant de toucher** : <pièges, état instable, travail à moitié appliqué>
+## 🔄 Resume state, YYYY-MM-DD
+**Where we are**: <2 to 4 factual lines, what works, what is in place>
+**In progress**: <the task started and not finished, with the files involved, or "nothing">
+**Next step**: <the very next concrete action, not a vague goal>
+**Know before touching**: <pitfalls, unstable state, half-applied work>
 
-## 🔴 Bloqué
-- [ ] <tâche>, bloquée par <quoi>, à débloquer en <comment>
+## 🔴 Blocked
+- [ ] <task>, blocked by <what>, to unblock by <how>
 
-## 🎯 Prochaines étapes
-- [ ] <tâche actionnable, verbe à l'infinitif, avec le fichier ou la zone>
+## 🎯 Next steps
+- [ ] <actionable task, verb first, with the file or zone>
 
-## 🧹 Dette et améliorations
-- [ ] <ce qu'on sait imparfait, avec l'impact, pas juste « refactorer »>
+## 🧹 Debt and improvements
+- [ ] <what we know is imperfect, with the impact, not just "refactor">
 
-## 💡 Idées non engagées
-- <ce qu'on ne fera peut-être jamais, à purger sans état d'âme>
+## 💡 Uncommitted ideas
+- <what we may never do, to purge without regret>
 ```
 
-**Les règles**
+The resume block is read under the title `## 🔄 Resume state, <date>`. A French block of an older
+project (a `## ...reprise...` title) is also read.
 
-Le bloc « État à la reprise » tient en 40 lignes, et se **réécrit depuis l'état courant** à
-chaque clôture, jamais en éditant le bloc précédent. C'est un état, pas un journal.
+**The rules**
 
-Une tâche cochée n'est pas archivée, elle est **supprimée**. Sa trace est au CHANGELOG. TODOS
-ne garde que le futur.
+The "Resume state" block fits in 40 lines and is **rewritten from the current state** at every
+debrief, never by editing the previous block. It is a state, not a log.
 
-Toute tâche mentionne un point d'ancrage : un fichier, un module, une commande. « Améliorer les
-perfs » ne sert à rien après un `/clear`. « Réduire les N+1 dans `repo/orders.py:list_orders` »
-se reprend tout de suite.
+A checked task is not archived, it is **deleted**. Its trace is in the CHANGELOG. TODOS keeps only
+the future.
 
-Rien d'entamé ne doit rester hors de ce fichier avant un `/clear`.
+Every task mentions an anchor: a file, a module, a command. "Improve performance" is useless after
+a `/clear`. "Reduce the N+1 queries in `repo/orders.py:list_orders`" can be picked up at once.
 
-**Ce qui sort du bloc a un propriétaire**
+Nothing started may stay outside this file before a `/clear`.
 
-| Ce que la phrase est | Où elle va |
+**What leaves the block has an owner**
+
+| What the sentence is | Where it goes |
 |---|---|
-| un événement, quelque chose qui a été fait | déjà au CHANGELOG, on la retire |
-| un piège, une contrainte | fiche du module, ou CODEMAP de la zone, ou zones sensibles racine si aucune zone |
-| une tâche | la liste de TODOS, avec son ancrage |
-| une décision et son pourquoi | ADR |
-| une piste écartée et pourquoi | l'ADR de la décision, ou les pièges de la fiche |
-| du récit, de l'insistance, des majuscules | rien, ça ne se garde pas |
+| An event, something that was done | already in the CHANGELOG, remove it |
+| A pitfall, a constraint | module page, or zone CODEMAP, or root sensitive zones if no zone |
+| A task | the TODOS list, with its anchor |
+| A decision and its why | ADR |
+| A discarded lead and why | the decision's ADR, or the page's pitfalls |
+| Narrative, emphasis, capitals | nothing, it is not kept |
 
-Trois interdits dans TODOS : pas de section « ce que cette session a produit », c'est du
-CHANGELOG. Pas de case cochée conservée, le fait vit au CHANGELOG. Pas de section « décidé »,
-c'est un ADR ou rien. Une affirmation non vérifiée porte « à vérifier », la session suivante
-vérifie avant d'agir dessus.
+Three prohibitions in TODOS: no "what this session produced" section, that is CHANGELOG. No
+checked box kept, the fact lives in the CHANGELOG. No "decided" section, that is an ADR or
+nothing. An unverified claim carries "to verify", and the next session verifies before acting on
+it.
 
-**Fichier entier** : cible 150 lignes, blocage à 300.
-
----
-
-## Les savoirs durables, et où ils atterrissent
-
-Ce sont les faits qu'aucune lecture du dépôt ne permet de retrouver. Le tableau plus haut donne
-la destination de chacun, voici le détail qui n'y tient pas.
-
-**ADR**, `docs/decisions/`, gabarit `templates/docs/ADR.md`. Contexte, options envisagées,
-décision, conséquences, ce qui devrait la faire reconsidérer. Un ADR accepté **ne se réécrit
-jamais** : la décision change, un nouvel ADR le supersède et l'ancien pointe vers le nouveau.
-
-**Piège**, la fiche `docs/` du module, la carte de sa zone, ou `CODEMAP.md` zones sensibles s'il
-n'a ni l'un ni l'autre. Écrit comme un symptôme suivi de sa cause, pas comme une consigne.
-« L'API renvoie 200 avec l'erreur dans le corps » se retient, « attention aux erreurs » ne sert
-à rien.
-
-**Préférence de l'utilisateur**, `CLAUDE.md`, qui se charge tout seul. Style demandé,
-conventions imposées, ce qu'il ne veut pas qu'on fasse. Reste court, seulement du permanent.
-
-**Contrainte d'environnement ou d'accès**, `CODEMAP.md` section dépendances. Quel service, quel
-compte, quelle région, où vit la clé. **Jamais la valeur d'un secret.**
-
-**Fait externe daté**, `docs/veille/` avec sa date, ou une entrée de `CHANGELOG.md` si c'est ce
-qui explique un changement. Périssable par nature, il se relit ou s'archive.
-
-**Règles communes.** Dates absolues, « la semaine dernière » devient faux dès le lendemain. Un
-fait porte son pourquoi, pas seulement son quoi. Une règle durable devenue fausse est
-**supprimée tout de suite**, pas archivée, sa disparition va au CHANGELOG si elle mérite une
-trace, les ADR seuls se supersèdent. En cas d'hésitation, choisis le propriétaire que relira
-quelqu'un qui travaille sur le sujet.
+**Whole file**: target 150 lines, blocker at 300.
 
 ---
 
-## CHANGELOG.md, le journal
+## Lasting knowledge, and where it lands
 
-**Rôle** : répondre à « qu'est-ce qui a changé, quand, pourquoi et comment on revient en
-arrière ». C'est la seule surface append-only de la convention.
+These are the facts no reading of the repo can recover. The table above gives each one's
+destination, here is the detail that does not fit in it.
+
+**ADR**, `docs/decisions/`, template `templates/docs/ADR.md`. Context, options considered,
+decision, consequences, what should make us reconsider. An accepted ADR is **never rewritten**:
+when the decision changes, a new ADR supersedes it and the old one points to the new one.
+
+**Pitfall**, the module's `docs/` page, its zone map, or `CODEMAP.md` sensitive zones if it has
+neither. Written as a symptom followed by its cause, not as an instruction. "The API returns 200
+with the error in the body" sticks, "beware of errors" is useless.
+
+**User preference**, `CLAUDE.md`, which loads by itself. Requested style, imposed conventions, what
+they do not want done. Stays short, permanent items only.
+
+**Environment or access constraint**, `CODEMAP.md` dependencies section. Which service, which
+account, which region, where the key lives. **Never the value of a secret.**
+
+**Dated external fact**, `docs/radar/` with its date, or a `CHANGELOG.md` entry if it explains a
+change. Perishable by nature, it is re-read or archived.
+
+**Common rules.** Absolute dates, "last week" is wrong by tomorrow. A fact carries its why, not
+only its what. A lasting rule that became false is **deleted at once**, not archived, its
+disappearance goes in the CHANGELOG if it deserves a trace, only ADRs supersede. When in doubt,
+pick the owner that someone working on the subject will re-read.
+
+---
+
+## CHANGELOG.md, the log
+
+**Role**: answer "what changed, when, why and how do we roll back". It is the only append-only
+surface of the convention.
 
 **Format**
 
 ```markdown
-## 2026-08-13, titre court et factuel
+## 2026-08-13, short factual title
 
-**Quoi** : ce qui a changé, concrètement. Fichiers, comportements, ressources.
-**Pourquoi** : le besoin ou le problème derrière.
-**Rollback** : comment défaire. Commit à révoquer, config à restaurer, migration inverse.
-**Voir aussi** : `docs/...`, ADR, ticket.
+**What**: what changed, concretely. Files, behaviours, resources.
+**Why**: the need or problem behind it.
+**Rollback**: how to undo. Commit to revert, config to restore, reverse migration.
+**See also**: `docs/...`, ADR, ticket.
 ```
 
-**Les règles**
+**The rules**
 
-Plus récent en haut. Une entrée par session utile, pas une par commit.
+Most recent on top. One entry per useful session, not one per commit.
 
-Le rollback n'est pas optionnel dès qu'un changement touche une donnée, un déploiement, une
-dépendance ou une configuration. C'est ce qui sauve la session suivante.
+Rollback is not optional as soon as a change touches data, a deployment, a dependency or a
+configuration. It is what saves the next session.
 
-Tu ne réécris jamais le passé. Une entrée erronée se corrige par une nouvelle entrée qui la
-mentionne, pas par une édition silencieuse.
+Never rewrite the past. A wrong entry is corrected by a new entry that mentions it, not by a
+silent edit.
 
-Une entrée volumineuse reste courte ici et pointe vers `docs/`, ou vers `changes/<date>-<slug>.md`
-si le projet a ce répertoire. Une entrée tient en 25 lignes, le détail va dans une fiche.
+A voluminous entry stays short here and points to `docs/`, or to `changes/<date>-<slug>.md` if the
+project has that directory. An entry fits in 25 lines, details go in a page.
 
-Au-delà de 30 entrées le journal tourne avec `$SKILL/scripts/ctx-rotation.sh` vers
-`archives/changelog/AAAA-MM.md`, et le fichier garde en tête la ligne qui le dit. Une entrée
-froide n'est pas fausse, c'est pourquoi elle va dans le seul endroit qu'on ne lit pas en reprise.
+Beyond 30 entries the log rotates with `$SKILL/scripts/ctx-rotation.sh` to
+`archives/changelog/YYYY-MM.md`, and the file keeps at the top the line that says so. A cold entry
+is not false, which is why it goes to the one place not read on resume.
 
-Si le projet publie des versions, tu peux adopter la structure Keep a Changelog
-(`## [1.4.0] 2026-08-13`, avec des sections Ajouté, Modifié, Corrigé, Retiré). La règle
-quoi, pourquoi, rollback reste applicable dans chaque section.
+If the project publishes versions, you can adopt the Keep a Changelog structure
+(`## [1.4.0] 2026-08-13`, with Added, Changed, Fixed, Removed sections). The what, why, rollback
+rule still applies in each section.
 
 ---
 
-## Ce qui vit dans CLAUDE.md, et pas ici
+## What lives in CLAUDE.md, and not here
 
-`CLAUDE.md` est chargé automatiquement à chaque session. C'est la surface la plus coûteuse en
-contexte. Tu y mets uniquement ce qui doit être vrai à chaque instant : commandes à utiliser,
-interdits durs, préférences durables de l'utilisateur, style, et le pointeur vers la convention
-de contexte.
+`CLAUDE.md` is loaded automatically in every session. It is the most expensive surface in context.
+Put in it only what must be true at every moment: commands to use, hard prohibitions, lasting user
+preferences, style, and the pointer to the context convention.
 
-Le reste vit ailleurs et se charge à la demande. La carte dans CODEMAP, l'état dans TODOS,
-l'historique dans CHANGELOG, les décisions dans `docs/decisions/`, le détail dans `docs/`.
+The rest lives elsewhere and loads on demand. The map in CODEMAP, the state in TODOS, the history
+in CHANGELOG, decisions in `docs/decisions/`, detail in `docs/`.
 
-C'est `CLAUDE.md` qui absorbe le plus facilement ce qui n'a pas de propriétaire évident, et
-c'est le risque à surveiller. Une règle qui n'est pas vraie à chaque instant n'a rien à y faire.
-Relis-le à chaque clôture avec cette question en tête, et coupe. Le bloc à coller est dans
-`templates/CLAUDE-snippet.md`.
+`CLAUDE.md` is what most easily absorbs what has no obvious owner, and that is the risk to watch. A
+rule that is not true at every moment does not belong there. Re-read it at every debrief with that
+question in mind, and cut. The block to paste is in `templates/CLAUDE-snippet.md`.
 
-`CLAUDE.md` ne porte ni état, ni récit, ni date d'événement. Cible 100 lignes, blocage à 200
-lignes ou 40 000 caractères. Une règle qui ne vaut que dans une zone descend dans
-`<zone>/CLAUDE.md`, ou dans `.claude/rules/<zone>.md` avec `paths:` chez Claude Code.
+`CLAUDE.md` carries no state, no narrative, no event date. Target 100 lines, blocker at 200 lines
+or 40,000 characters. A rule that only holds in one zone goes down into `<zone>/CLAUDE.md`, or into
+`.claude/rules/<zone>.md` with `paths:` in Claude Code.

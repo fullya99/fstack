@@ -1,28 +1,28 @@
 # Documentation, {{PROJECT_NAME}}
 
-> **Tout ce qui est ici est vrai.** Une fiche fausse ou périmée part dans `archives/`, voir
-> `archives/README.md`. Une fiche absente de ce tableau est invisible, donc l'index se met à
-> jour dans le même mouvement que la fiche.
+> **Everything here is true.** A false or stale page goes to `archives/`, see
+> `archives/README.md`. A page missing from this table is invisible, so the index is updated in
+> the same move as the page.
 
 ## Index
 
-| Fiche | Type | Portée | Statut | Vérifié le |
+| Page | Type | Scope | Status | Checked on |
 |---|---|---|---|---|
 | | | | | |
 
-Statuts : `✅` à jour, `🟡` à vérifier (le périmètre a bougé, la fiche n'a pas été relue),
-`🔴` obsolète (direction `archives/` à la prochaine clôture).
+Statuses: `✅` up to date, `🟡` to verify (the scope moved, the page was not reread),
+`🔴` obsolete (heading for `archives/` at the next debrief).
 
-## Organisation
+## Layout
 
-| Répertoire | Question |
+| Directory | Question |
 |---|---|
-| `modules/` | Comment cette brique fonctionne-t-elle ? |
-| `features/` | Que fait le produit, de bout en bout ? |
-| `ops/` | Comment je refais cette opération ? |
-| `decisions/` | Pourquoi ce choix ? (ADR, supersédés, jamais réécrits ni archivés) |
+| `modules/` | How does this brick work? |
+| `features/` | What does the product do, end to end? |
+| `ops/` | How do I redo this operation? |
+| `decisions/` | Why this choice? (ADRs, superseded, never rewritten or archived) |
 
-## Archivé récemment
+## Recently archived
 
-L'index complet des documents retirés, avec la date, la raison et le remplaçant, est dans
+The full index of removed documents, with the date, the reason and the replacement, is in
 `archives/README.md`.

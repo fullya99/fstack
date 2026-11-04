@@ -1,44 +1,44 @@
-# ADR-{{NNNN}}, <titre : une phrase nominale, la décision elle-même>
+# ADR-{{NNNN}}, <title: a noun phrase, the decision itself>
 
-> **Statut** : Proposé, ou **Accepté** le {{DATE}}, ou Déprécié, ou Superseded par `ADR-00NN`
-> **Décideurs** : <qui a tranché>
-> **Portée** : <ce que la décision engage>
+> **Status**: Proposed, or **Accepted on** {{DATE}}, or Deprecated, or Superseded by `ADR-00NN`
+> **Deciders**: <who decided>
+> **Scope**: <what the decision commits>
 
-<!-- Un ADR accepté ne se réécrit JAMAIS. Si la décision change, tu écris un nouvel ADR et tu
-     marques celui-ci « Superseded par ». Les ADR supersédés RESTENT en place, ils ne partent
-     pas en archives/. Leur valeur vient d'avoir été vrais à une époque. -->
+<!-- An accepted ADR is NEVER rewritten. If the decision changes, you write a new ADR and you
+     mark this one "Superseded by". Superseded ADRs STAY in place, they do not go to
+     archives/. Their value comes from having been true at one time. -->
 
-## Contexte
+## Context
 
-<Les forces en présence, en langage neutre et factuel. Le problème, les contraintes, ce qui
-rendait le choix nécessaire à ce moment-là. Pas de jugement, pas de solution.>
+<The forces at play, in neutral and factual language. The problem, the constraints, what made
+the choice necessary at that moment. No judgment, no solution.>
 
-## Options envisagées
+## Options considered
 
-| Option | Pour | Contre |
+| Option | Pros | Cons |
 |---|---|---|
-| **<A, retenue>** | <...> | <...> |
+| **<A, chosen>** | <...> | <...> |
 | <B> | <...> | <...> |
-| <C, ne rien faire> | <...> | <...> |
+| <C, do nothing> | <...> | <...> |
 
-## Décision
+## Decision
 
-**On retient <option A>.**
+**We choose <option A>.**
 
-<Le raisonnement, en phrases complètes. Pourquoi ces avantages pèsent plus que ces
-inconvénients, ici et maintenant.>
+<The reasoning, in full sentences. Why these advantages outweigh these drawbacks, here and
+now.>
 
-## Conséquences
+## Consequences
 
-**Positives** : <ce que ça débloque.>
+**Positive**: <what it unblocks.>
 
-**Négatives** : <le coût accepté. Ne dissimule jamais cette partie, c'est elle qui permettra
-plus tard de juger si la décision tient encore.>
+**Negative**: <the accepted cost. Never hide this part, it is what will later let you judge
+whether the decision still holds.>
 
-**Neutres** : <ce que ça impose sans être bon ni mauvais. Dépendance nouvelle, convention à
-respecter, migration à prévoir.>
+**Neutral**: <what it imposes without being good or bad. New dependency, convention to
+follow, migration to plan.>
 
-## Ce qui devrait faire reconsidérer cette décision
+## What should make us reconsider this decision
 
-- <changement de contexte qui invaliderait le raisonnement : seuil de charge, coût, fin de
-  support, arrivée d'une alternative crédible>
+- <context change that would invalidate the reasoning: load threshold, cost, end of
+  support, arrival of a credible alternative>

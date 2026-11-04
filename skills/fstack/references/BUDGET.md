@@ -1,162 +1,164 @@
-# BUDGET : ce qui déborde descend d'un étage
+# BUDGET: what overflows moves down a layer
 
-> Chaque surface de la convention a une cible, une alerte, un blocage. Le budget est un invariant,
-> au même rang que le vrai : un fichier juste mais trop long pour être lu est une doc perdue.
+> Every surface of the convention has a target, a warning and a blocker. The budget is an
+> invariant, on par with truth: a file that is correct but too long to be read is lost
+> documentation.
 
-## Pourquoi un budget
+## Why a budget
 
-Cas mesuré, un projet réel de 979 fichiers, 549 commits, 83 clôtures en 17 jours.
+Measured case, a real project of 979 files, 549 commits, 83 debriefs in 17 days.
 
-| Pilier | Lignes | Ce qui a dérivé |
+| Pillar | Lines | What drifted |
 |---|---|---|
-| `CLAUDE.md` | 647 | un paragraphe d'état de 70 lignes, 99 règles avec leur récit |
-| `CODEMAP.md` | 2 567 | zones sensibles 1 388 lignes, commandes 513 lignes avec des récits dans les commentaires |
-| `TODOS.md` | 6 534 | bloc de reprise de 2 579 lignes, 9 sections « ce que cette session a produit », 73 cases cochées |
-| `CHANGELOG.md` | 8 283 | 148 entrées, jusqu'à 153 lignes chacune |
+| `CLAUDE.md` | 647 | a 70-line state paragraph, 99 rules with their narrative |
+| `CODEMAP.md` | 2,567 | sensitive zones 1,388 lines, commands 513 lines with narratives in the comments |
+| `TODOS.md` | 6,534 | a 2,579-line resume block, 9 "what this session produced" sections, 73 checked boxes |
+| `CHANGELOG.md` | 8,283 | 148 entries, up to 153 lines each |
 
-`ctx-audit.sh` rendait 11 alertes mineures sur ce projet, aucune sur la taille. Trois causes.
+`ctx-audit.sh` returned 11 minor warnings on this project, none about size. Three causes.
 
-1. Aucun seuil, donc aucune porte. « Vise court » restait un conseil.
-2. « Aucune suppression silencieuse » se lisait comme « aucun retrait ». Le bloc de reprise
-   devenait un journal, TODOS absorbait des comptes-rendus de session, CLAUDE.md absorbait l'état.
-3. Un seul niveau de doc pour un projet à quinze modules. Les pièges de module retombaient dans
-   les zones sensibles du CODEMAP racine et dans CLAUDE.md, faute de propriétaire plus proche.
+1. No threshold, so no gate. "Aim short" stayed advice.
+2. "No silent deletion" was read as "no removal". The resume block became a log, TODOS absorbed
+   session reports, CLAUDE.md absorbed state.
+3. A single docs level for a fifteen-module project. Module pitfalls fell back into the root
+   CODEMAP sensitive zones and into CLAUDE.md, for lack of a closer owner.
 
-Le point de recherche qui compte, et pourquoi on classe avant de retirer. Au-delà d'un certain
-volume d'instructions, le modèle ne se met pas à ignorer seulement la dernière règle ajoutée, il
-suit l'ensemble des règles moins bien, de façon uniforme (HumanLayer, 2025-11-25,
-https://www.humanlayer.com/blog/writing-a-good-claude-md). Et un résumé uniforme d'un journal
-perd les contraintes qu'il porte, 53 % de rappel après une passe de compaction, 10 % après cinq
-(« The Compaction Cliff in Long-Running AI Agent Memory », arxiv 2608.22752). Les deux mènent à la
-même règle : on ne retire jamais en bloc, on classe d'abord chaque phrase par ce qu'elle est, et
-chacune part chez son propriétaire.
+The research point that matters, and why we classify before removing. Beyond a certain volume of
+instructions, the model does not just start ignoring the last rule added, it follows all the rules
+less well, uniformly (HumanLayer, 2025-11-25,
+https://www.humanlayer.com/blog/writing-a-good-claude-md). And a uniform summary of a log loses the
+constraints it carries, 53% recall after one compaction pass, 10% after five ("The Compaction Cliff
+in Long-Running AI Agent Memory", arxiv 2608.22752). Both lead to the same rule: never remove in
+bulk, classify each sentence first by what it is, and each one goes to its owner.
 
-Le seuil chiffré n'est qu'un détecteur, pas la règle elle-même. Le critère de découpe reste
-sémantique, un fichier répond à une question, c'est ce que disent Diátaxis et DITA, qui ne fixent
-aucune longueur maximale (diataxis.fr, https://diataxis.fr/start-here/). Le seul guide de style à
-publier une règle chiffrée de découpe est GitLab, plus de cinq niveaux de titres veut dire
-plusieurs sujets (docs.gitlab.com, https://docs.gitlab.com/development/documentation/styleguide/).
-Le nombre dit d'aller regarder, ce qu'on trouve dit quel geste prendre.
+The numeric threshold is only a detector, not the rule itself. The splitting criterion stays
+semantic, one file answers one question, which is what Diátaxis and DITA say, and neither sets a
+maximum length (diataxis.fr, https://diataxis.fr/start-here/). The only style guide to publish a
+numeric splitting rule is GitLab, more than five heading levels means several subjects
+(docs.gitlab.com, https://docs.gitlab.com/development/documentation/styleguide/). The number says
+to go look, what you find says what to do.
 
-## Les seuils
+## The thresholds
 
-| Surface | Cible | Alerte | Blocage |
+| Surface | Target | Warning | Blocker |
 |---|---|---|---|
-| `CLAUDE.md` racine | ≤ 100 lignes | 150 | 200 lignes, ou 40 000 caractères |
-| `CLAUDE.md` de zone | ≤ 30 | 40 | 60 |
-| `CODEMAP.md` racine | ≤ 250 | 300 lignes, ou 30 000 caractères | 400 lignes, ou 40 000 caractères |
-| `CODEMAP.md` de zone | ≤ 150 | 200 lignes, ou 20 000 caractères | 250 lignes, ou 25 000 caractères |
-| `TODOS.md` | ≤ 150 | 200 lignes, ou 20 000 caractères | 300 lignes, ou 30 000 caractères |
-| bloc « État à la reprise » | ≤ 40 | 50 | 80 |
-| `CHANGELOG.md` | ≤ 30 entrées | 40 entrées ou 1 000 lignes | 60 entrées ou 1 500 lignes |
-| une entrée de CHANGELOG | ≤ 25 lignes | 40 | pas de blocage, on signale |
-| fiche `docs/` | ≤ 200 | 250 | 300 |
-| une ligne de `TODOS.md`, `CODEMAP.md`, `CLAUDE.md`, `CHANGELOG.md` (hors bloc de code) | pas de cible, seule l'alerte se mesure | 800 caractères, clé `ligne` | pas de blocage, une alerte par fichier |
-| tout journal (≥ 10 titres `## AAAA-MM-JJ`) | comme le CHANGELOG | | |
-| règles `.claude/rules/` sans `paths` (total) | ≤ 100 | 150 | 200 |
-| coût total de reprise | ≤ 450 lignes | 600 lignes, ou 60 000 caractères | 900 lignes, ou 90 000 caractères |
-| index de la mémoire automatique | ≤ 100 | 150 | pas de blocage, hors dépôt |
-| plan terminé | résumé de 20 lignes | plus de 300 lignes, ou une case `[ ]` ouverte | pas de blocage |
+| root `CLAUDE.md` | ≤ 100 lines | 150 | 200 lines, or 40,000 characters |
+| zone `CLAUDE.md` | ≤ 30 | 40 | 60 |
+| root `CODEMAP.md` | ≤ 250 | 300 lines, or 30,000 characters | 400 lines, or 40,000 characters |
+| zone `CODEMAP.md` | ≤ 150 | 200 lines, or 20,000 characters | 250 lines, or 25,000 characters |
+| `TODOS.md` | ≤ 150 | 200 lines, or 20,000 characters | 300 lines, or 30,000 characters |
+| "Resume state" block | ≤ 40 | 50 | 80 |
+| `CHANGELOG.md` | ≤ 30 entries | 40 entries or 1,000 lines | 60 entries or 1,500 lines |
+| one CHANGELOG entry | ≤ 25 lines | 40 | no blocker, reported |
+| `docs/` page | ≤ 200 | 250 | 300 |
+| one line of `TODOS.md`, `CODEMAP.md`, `CLAUDE.md`, `CHANGELOG.md` (outside code blocks) | no target, only the warning is measured | 800 characters, key `ligne` | no blocker, one warning per file |
+| any log (≥ 10 `## YYYY-MM-DD` headings) | same as CHANGELOG | | |
+| `.claude/rules/` rules without `paths` (total) | ≤ 100 | 150 | 200 |
+| total resume cost | ≤ 450 lines | 600 lines, or 60,000 characters | 900 lines, or 90,000 characters |
+| automatic memory index | ≤ 100 | 150 | no blocker, outside the repo |
+| finished plan | 20-line summary | over 300 lines, or one open `[ ]` box | no blocker |
 
-Le seuil en caractères vaut cent caractères par ligne de budget. Un budget en lignes ne voit pas un
-fichier court dont chaque ligne est un tableau ou une preuve : un `CODEMAP.md` de 191 lignes peut
-peser 126 000 caractères et passer sous 300 lignes. Les caractères se comptent sans les octets de
-continuation UTF-8, une lettre accentuée vaut un caractère, pas deux. Ils s'ajoutent aux lignes, ils
-ne les remplacent pas : le premier seuil franchi parle. Pour le coût de reprise, le message donne
-aussi un ordre de grandeur en tokens, caractères divisés par quatre, qui n'entre dans aucun seuil.
+The character threshold is one hundred characters per budget line. A line budget does not see a
+short file whose every line is a table or a proof: a 191-line `CODEMAP.md` can weigh 126,000
+characters and pass under 300 lines. Characters are counted without UTF-8 continuation bytes, an
+accented letter is one character, not two. They add to the lines, they do not replace them: the
+first threshold crossed speaks. For the resume cost, the message also gives an order of magnitude in
+tokens, characters divided by four, which enters no threshold.
 
-Taille du projet, comptée en fichiers hors `.git`, dépendances, builds, `archives/` :
+Project size, counted in files outside `.git`, dependencies, builds, `archives/`:
 
-| Taille | Fichiers | Ce que la convention attend |
+| Size | Files | What the convention expects |
 |---|---|---|
-| petite | < 150 | un seul niveau, pas de zone |
-| moyenne | 150 à 600 | des zones là où le CODEMAP racine déborde |
-| grande | > 600 | des zones dès l'INIT, le CODEMAP racine est un index |
+| small | < 150 | a single level, no zone |
+| medium | 150 to 600 | zones where the root CODEMAP overflows |
+| large | > 600 | zones from SETUP, the root CODEMAP is an index |
 
-**Alerte** : à traiter à cette clôture, ou une tâche datée dans TODOS, une seule fois. Une alerte
-qui revient à la clôture suivante devient un blocage. **Blocage** : la clôture n'est pas finie tant
-que ce fichier dépasse ce seuil.
+**Warning**: handle at this debrief, or a dated task in TODOS, once only. A warning that comes back
+at the next debrief becomes a blocker. **Blocker**: the debrief is not finished while this file
+exceeds this threshold.
 
-`ctx-audit.sh --budget` porte exactement ces chiffres, section 10. Les deux se changent ensemble,
-un seuil modifié ici et pas dans le script rend l'audit faux. Les plans terminés et l'index de la
-mémoire automatique se lisent en section 11, que `--budget` saute.
+`ctx-audit.sh --budget` carries exactly these numbers, section 10. Both change together, a
+threshold changed here and not in the script makes the audit wrong. Finished plans and the
+automatic memory index are read in section 11, which `--budget` skips.
 
-### Ce que le bloc règle
+### What the block sets
 
-`seuils: <fichier>=N` fixe le seuil d'**alerte** de ce fichier à N. Le seuil de blocage suit dans
-le même rapport que les valeurs par défaut du tableau, arrondi à l'entier : `CODEMAP.md=600` donne
-une alerte à 600 et un blocage à 800, comme 300 et 400 par défaut. Les surfaces qui ne sont pas un
-fichier ont leur clé : `reprise` (bloc de reprise), `cout-reprise`, `regles-sans-paths`,
-`memoire-auto`. Le seuil en caractères d'un fichier a sa clé `car-<fichier>` (`car-CODEMAP.md=40000`
-donne une alerte à 40 000 caractères et un blocage à 53 333), et celui du coût de reprise
-`car-cout-reprise`. Relever le seuil en lignes d'un fichier ne relève pas son seuil en caractères.
+`seuils: <file>=N` sets the file's **warning** threshold to N. The blocker threshold follows in the
+same report as the table's defaults, rounded to the integer: `CODEMAP.md=600` gives a warning at
+600 and a blocker at 800, like 300 and 400 by default. Surfaces that are not a file have their own
+key: `reprise` (resume block), `cout-reprise`, `regles-sans-paths`, `memoire-auto`. A file's
+character threshold has its key `car-<file>` (`car-CODEMAP.md=40000` gives a warning at 40,000
+characters and a blocker at 53,333), and the resume cost one `car-cout-reprise`. Raising a file's
+line threshold does not raise its character threshold.
 
-`ajourne: <fichier>=N@AAAA-MM-JJ` gèle un dépassement à sa valeur et à sa date. Tant que le
-fichier ne dépasse pas N, son alerte ou son blocage ne se dit plus, l'audit le rappelle en
-information. S'il dépasse N, c'est un blocage : un dépassement gelé ne grossit plus. Dès qu'il
-repasse sous son seuil d'alerte, l'audit demande de retirer l'entrée.
+`ajourne: <file>=N@YYYY-MM-DD` freezes an overshoot at its value and date. As long as the file does
+not exceed N, its warning or blocker is no longer stated, the audit recalls it as information. If
+it exceeds N, it is a blocker: a frozen overshoot no longer grows. As soon as it falls back under
+its warning threshold, the audit asks to remove the entry.
 
-`taille-forcee: petite|moyenne|grande` impose la taille du projet au lieu de la mesure. L'audit
-dit quand la mesure la contredit.
+`taille-forcee: petite|moyenne|grande` imposes the project size instead of the measurement. The
+audit says when the measurement contradicts it.
 
-### Le coût total de reprise
+### The total resume cost
 
-Ce qu'une session charge avant la première question : `CLAUDE.md`, les fichiers qu'il importe par
-`@` (quatre sauts), les règles `.claude/rules/` sans `paths`, le bloc de reprise de TODOS, le
-`CODEMAP.md` racine et les trois dernières entrées du journal. Chaque fichier peut tenir dans son
-budget et la somme déborder, c'est le cas que ce seuil attrape. `--budget` donne le détail, en
-lignes puis en caractères : la somme des mêmes surfaces compte aussi 60 000 caractères d'alerte et
-90 000 de blocage.
+What a session loads before the first question: `CLAUDE.md`, the files it imports through `@`
+(four hops), the `.claude/rules/` rules without `paths`, the TODOS resume block, the root
+`CODEMAP.md` and the last three log entries. Each file can fit in its budget and the sum overflow,
+which is the case this threshold catches. `--budget` gives the detail, in lines then characters:
+the sum of the same surfaces also counts 60,000 characters as a warning and 90,000 as a blocker.
 
-Au-delà de cinq alertes de même nature dans une section (« pas d'en-tête de statut » sur cent
-fiches), le rapport en texte imprime les trois premières puis une ligne « et N autres de même
-nature ». Le nombre d'alertes du bilan les compte toutes, un blocage n'est jamais regroupé, et
-`--json` garde chaque entrée avec un champ `nature`.
+Beyond five warnings of the same nature in a section ("no status header" over a hundred pages), the
+text report prints the first three then a line "and N more of the same nature". The summary's
+warning count counts them all, a blocker is never grouped, and `--json` keeps every entry with a
+`nature` field.
 
-Une règle en `globs:` ne se charge jamais par chemin, Claude Code ne lit que `paths`. Elle compte
-donc dans les règles sans `paths`, et l'audit la signale.
+A rule under `globs:` is never loaded by path, Claude Code only reads `paths`. It therefore counts
+among the rules without `paths`, and the audit reports it.
 
-## Le geste par fichier
+## The move per file
 
-### Bloc de reprise
+### Resume block
 
-Réécrit depuis l'état courant, jamais par édition du bloc précédent. Ce qui en sort a un
-propriétaire, classe avant de retirer.
+Rewritten from the current state, never by editing the previous block. What leaves it has an owner,
+classify before removing.
 
-| Ce que la phrase est | Où elle va |
+| What the sentence is | Where it goes |
 |---|---|
-| un événement, quelque chose qui a été fait | déjà au CHANGELOG, on la retire |
-| un piège, une contrainte | fiche du module, ou CODEMAP de la zone, ou, sans module ni zone, `docs/pieges/` si le projet en a un, sinon la section zones sensibles de `CODEMAP.md`, jamais les deux dans un même projet |
-| une tâche | la liste de TODOS, avec son ancrage |
-| une décision et son pourquoi | ADR |
-| une piste écartée et pourquoi | l'ADR de la décision, ou les pièges de la fiche |
-| du récit, de l'insistance, des majuscules | rien, ça ne se garde pas |
+| An event, something that was done | already in the CHANGELOG, remove it |
+| A pitfall, a constraint | module page, or zone CODEMAP, or, with neither module nor zone, `docs/pitfalls/` if the project has one, otherwise the sensitive zones section of `CODEMAP.md`, never both in one project |
+| A task | the TODOS list, with its anchor |
+| A decision and its why | ADR |
+| A discarded lead and why | the decision's ADR, or the page's pitfalls |
+| Narrative, emphasis, capitals | nothing, it is not kept |
+
+The block is read under the title `## 🔄 Resume state, <date>`. A French block of an older project
+(a `## ...reprise...` title) is also read.
 
 ### TODOS
 
-Supprime les cases cochées, le fait vit déjà au CHANGELOG. Sors toute section « ce que cette
-session a produit » vers le CHANGELOG, TODOS ne garde que le futur. Dégraisse les tâches sans
-ancrage. `ctx-audit.sh --budget` compte les cases et les sections de session, section 10.
+Delete the checked boxes, the fact already lives in the CHANGELOG. Move every "what this session
+produced" section to the CHANGELOG, TODOS keeps only the future. Trim tasks without an anchor.
+`ctx-audit.sh --budget` counts the boxes and the session sections, section 10.
 
-### CHANGELOG et tout journal
+### CHANGELOG and any log
 
 ```bash
-bash "$SKILL/scripts/ctx-rotation.sh" --fichier CHANGELOG.md --dry-run
-bash "$SKILL/scripts/ctx-rotation.sh" --fichier CHANGELOG.md
+bash "$SKILL/scripts/ctx-rotation.sh" --file CHANGELOG.md --dry-run
+bash "$SKILL/scripts/ctx-rotation.sh" --file CHANGELOG.md
 ```
 
-Déplace les entrées anciennes vers `archives/<nom>/AAAA-MM.md`, garde les 30 plus récentes.
+Moves old entries to `archives/<name>/YYYY-MM.md`, keeps the 30 most recent.
 
-Le plafond de 25 lignes par entrée vaut **à l'écriture**. Un journal est append-only, on ne réécrit
-pas le passé, donc une vieille entrée trop longue est une information et pas une dette. L'audit ne
-la signale en alerte que si elle fait partie des trois plus récentes.
-Ensuite raccourcis toute entrée de plus de 25 lignes, le détail part dans la fiche du module ou
-dans `docs/changes/<date>-<slug>.md`, l'entrée garde quoi, pourquoi, rollback, un pointeur.
+The 25-line cap per entry holds **at writing time**. A log is append-only, we do not rewrite the
+past, so an old entry that is too long is information, not debt. The audit only warns about it if it
+is among the three most recent.
+Then shorten any entry over 25 lines, the detail goes in the module page or in
+`docs/changes/<date>-<slug>.md`, the entry keeps what, why, rollback, a pointer.
 
-### CODEMAP racine
+### Root CODEMAP
 
-Crée les zones candidates que `ctx-audit.sh --budget` liste, descends-y leurs zones sensibles et
-leurs commandes, laisse un pointeur dans la table « Zones ».
+Create the candidate zones that `ctx-audit.sh --budget` lists, move their sensitive zones and
+commands down into them, leave a pointer in the "Zones" table.
 
 ```bash
 bash "$SKILL/scripts/ctx-init.sh" --zone src/<dir> --with-claude
@@ -164,61 +166,58 @@ bash "$SKILL/scripts/ctx-init.sh" --zone src/<dir> --with-claude
 
 ### CLAUDE.md
 
-Le mode AUDIT, sinon la procédure du paragraphe suivant.
+CHECK mode, otherwise the procedure in the next paragraph.
 
-### Fiche docs/
+### docs/ page
 
-Au-delà de 250 lignes, scinde en deux sujets distincts. Si une partie ne sert plus à décider,
-sors-la vers `archives/` avec son en-tête, garde la fiche courte pour ce qui reste vrai.
+Beyond 250 lines, split into two distinct subjects. If a part no longer helps decide, move it to
+`archives/` with its header, keep the page short for what remains true.
 
-Sur un fichier déjà long, l'audit signale aussi la profondeur de titres au-delà de quatre
-niveaux. C'est le meilleur indice de deux sujets recousus dans une seule fiche.
+On an already long file, the audit also reports heading depth beyond four levels. It is the best
+sign of two subjects sewn into one page.
 
-### Carte de zone
+### Zone map
 
-Au-delà de 250 lignes, scinde la zone en deux. Le critère est le même que pour créer une zone :
-un sujet qu'on a en tête en même temps, jamais deux sujets recousus dans une seule carte.
+Beyond 250 lines, split the zone in two. The criterion is the same as for creating a zone: one
+subject you hold in mind at once, never two subjects sewn into one map.
 
-## CLAUDE.md sans le mode AUDIT
+## CLAUDE.md without CHECK mode
 
-Quand le mode AUDIT est disponible, la clôture le lance sur un `CLAUDE.md` au-dessus
-du seuil d'alerte, il fait une coupe avec preuve, et c'est le choix préféré quand il est là.
+When CHECK mode is available, the debrief runs it on a `CLAUDE.md` above the warning threshold, it
+makes a cut with proof, and that is the preferred choice when it is there.
 
-Sans lui, la procédure courte, en quatre étages : la racine (chargée à chaque session), une règle
-liée à des chemins (`.claude/rules/<zone>.md` avec `paths:`, chez Claude Code seulement, chargée
-seulement quand un fichier concerné est touché), le `CLAUDE.md` d'une zone, une fiche `docs/`.
+Without it, the short procedure, in four layers: the root (loaded every session), a path-bound rule
+(`.claude/rules/<zone>.md` with `paths:`, Claude Code only, loaded only when a matching file is
+touched), a zone's `CLAUDE.md`, a `docs/` page.
 
-Pour chaque ligne, dans cet ordre.
+For each line, in this order.
 
-1. Est-ce un état, un récit, une date d'événement ? Rien de tout ça n'a sa place ici. L'état part
-   dans TODOS, le récit dans la fiche du module, la date reste au CHANGELOG.
-2. Est-ce vrai partout, quel que soit le fichier ouvert ? Elle reste à la racine.
-3. Ne vaut-elle que dans une zone ? Elle descend dans `<zone>/CLAUDE.md`, ou dans
-   `.claude/rules/<zone>.md` avec `paths:` si le projet préfère ce mécanisme.
-4. Sinon, le test qui tranche : **retirer cette ligne ferait-il faire une erreur ?** Non, elle
-   sort. Oui, elle reste, même si le fichier dépasse encore la cible.
+1. Is it a state, a narrative, an event date? None of that belongs here. State goes to TODOS,
+   narrative to the module page, the date stays in the CHANGELOG.
+2. Is it true everywhere, whatever file is open? It stays at the root.
+3. Does it only hold in one zone? It goes down into `<zone>/CLAUDE.md`, or into
+   `.claude/rules/<zone>.md` with `paths:` if the project prefers that mechanism.
+4. Otherwise, the deciding test: **would removing this line cause a mistake?** No, it goes. Yes, it
+   stays, even if the file still exceeds the target.
 
-## Découper entre sous-agents
+## Splitting between subagents
 
-Sur une grande codebase, ce travail se découpe par zone, un sous-agent par zone. Chacun reçoit le
-chemin de la zone, sa carte actuelle et le critère de fin : la carte tient en 150 lignes et
-chaque piège de la zone y est écrit.
+On a large codebase, this work splits by zone, one subagent per zone. Each receives the zone path,
+its current map and the end criterion: the map fits in 150 lines and every pitfall of the zone is
+written in it.
 
-Le principal garde ce qui ne se découpe pas : la réécriture du bloc de reprise, toute décision
-d'archivage, et tout ce qui est vrai partout, qui reste à la racine et jamais seulement dans une
-zone.
+The main session keeps what cannot be split: rewriting the resume block, every archiving decision,
+and everything true everywhere, which stays at the root and never only in a zone.
 
-## Ce que le budget n'autorise pas
+## What the budget does not allow
 
-- Effacer un piège pour tenir le seuil. Il part chez son propriétaire, il ne disparaît pas.
-- Résumer un journal au lieu de le faire tourner. `ctx-rotation.sh` déplace, il ne condense pas.
-- Descendre une règle transverse dans une zone pour alléger la racine. Un agent qui travaille
-  ailleurs ne la verrait plus.
-- Redater une entrée ou une fiche sans l'avoir relue. Une date de fraîcheur fausse est pire
-  qu'absente.
-- Reporter un blocage à la clôture suivante. Un blocage se traite maintenant, une alerte peut
-  attendre une fois.
-- Remplacer un contenu par un `include` ou une transclusion pour raccourcir un fichier. Le coût
-  est documenté ailleurs, un extrait perd son sens hors de son contexte d'origine, la maintenance
-  dérive par petits correctifs locaux, et un fichier plein d'includes n'est plus lisible en un
-  passage par un agent. Un import `@fichier` charge tout au démarrage, il n'allège rien.
+- Erasing a pitfall to meet the threshold. It goes to its owner, it does not disappear.
+- Summarising a log instead of rotating it. `ctx-rotation.sh` moves, it does not condense.
+- Moving a cross-cutting rule down into a zone to lighten the root. An agent working elsewhere
+  would no longer see it.
+- Redating an entry or a page without having re-read it. A false freshness date is worse than none.
+- Postponing a blocker to the next debrief. A blocker is handled now, a warning can wait once.
+- Replacing content with an `include` or a transclusion to shorten a file. The cost is documented
+  elsewhere, an excerpt loses its meaning outside its original context, maintenance drifts through
+  small local fixes, and a file full of includes can no longer be read in one pass by an agent. An
+  `@file` import loads everything at startup, it lightens nothing.

@@ -1,133 +1,132 @@
-# Anatomie du prompt d'exécution
+# Anatomy of the execution prompt
 
-## 1. La forme
+## 1. The shape
 
-Un seul bloc de texte, jamais écrit dans un fichier du projet. Il est joué dans une session neuve,
-sans résidu de l'exploration qui précède. Chaque plateforme a sa façon d'en ouvrir une, chez
-Claude Code une nouvelle session ou `/clear`.
+A single block of text, never written to a project file. It is played in a fresh session, with no
+residue from the exploration before it. Each platform has its own way to open one, in Claude Code
+a new session or `/clear`.
 
-Chez Claude Code, le bloc se range dans la file de relance, une entrée par plan, et
-`/fstack:relance open` le joue après le redémarrage. Ailleurs, il est produit dans le chat et
-l'opérateur le colle. Dans les deux cas il se suffit à lui-même : il ne suppose ni la reprise de
-clôture ni le prompt d'un autre plan.
+In Claude Code, the block goes into the brief queue, one entry per plan, and
+`/fstack:brief open` plays it after the restart. Elsewhere, it is produced in the chat and the
+operator pastes it. In both cases it stands on its own: it assumes neither the debrief handover nor
+another plan's prompt.
 
-## 2. L'ordre des morceaux
+## 2. Order of the pieces
 
-La doc de prompting d'Anthropic mesure jusqu'à 30% de qualité en plus quand le contexte long
-arrive en haut du prompt et les instructions en bas. Un modèle qui lit d'abord ce qu'il doit
-savoir, et seulement ensuite ce qu'il doit faire, s'appuie sur ce savoir au moment d'agir. Dans
-l'autre sens, l'instruction arrive avant le contexte qui la justifie et le modèle la traite à
-moitié à vide.
+Anthropic's prompting docs measure up to 30% better quality when long context comes at the top of
+the prompt and instructions at the bottom. A model that first reads what it must know, and only
+then what it must do, relies on that knowledge when it acts. The other way around, the instruction
+arrives before the context that justifies it and the model handles it half empty.
 
-Ordre imposé :
+Required order:
 
-1. le chemin du plan, désigné comme source de vérité, à lire en entier avant toute chose
-2. les décisions verrouillées, restatées en clair, pas seulement citées par référence
-3. la liste de ce qu'on ne touche pas
-4. les invariants
-5. la composition de l'équipe et le rôle de chacun
-6. les étapes et leurs portes de vérification
-7. le démarrage, en dernier, explicite
+1. the plan path, named as the source of truth, to read in full before anything else
+2. the locked decisions, restated in plain words, not only cited by reference
+3. the list of what we do not touch
+4. the invariants
+5. the team composition and each member's role
+6. the steps and their verification gates
+7. the start, last, explicit
 
-## 3. La formulation
+## 3. Wording
 
-Dire ce qu'il faut faire plutôt que ce qu'il ne faut pas faire. « Regroupe le résultat dans un
-état court en trois lignes » porte mieux que « ne rends pas un pavé de texte ». Quand une
-interdiction est vraiment nécessaire, elle vient toujours avec sa raison : un interdit sec se
-respecte moins qu'un interdit justifié, l'exécutant comprend le risque et ne cherche pas de
-contournement. Éviter le registre « CRITIQUE, tu DOIS », qui pousse le modèle à une prudence
-excessive sur tout le reste du prompt, pas seulement sur le point visé.
+Say what to do rather than what not to do. "Gather the result into a short three-line status"
+carries better than "don't return a wall of text". When a prohibition is truly needed, it always
+comes with its reason: a bare ban is respected less than a justified one, the executor understands
+the risk and does not look for a workaround. Avoid the "CRITICAL, you MUST" register, which pushes
+the model to excessive caution on the whole rest of the prompt, not only on the targeted point.
 
-## 4. Les balises
+## 4. Tags
 
-Séparer les morceaux par des balises XML nommées, cohérentes d'un bout à l'autre du prompt :
-`<plan>`, `<decisions>`, `<ne_pas_toucher>`, `<invariants>`, `<equipe>`, `<etapes>`, `<demarrage>`.
-Une balise par section de la partie 2, dans le même ordre.
+Separate the pieces with named XML tags, consistent from one end of the prompt to the other:
+`<plan>`, `<decisions>`, `<off_limits>`, `<invariants>`, `<team>`, `<steps>`, `<start>`.
+One tag per section of part 2, in the same order.
 
-## 5. L'équipe
+## 5. The team
 
-Trois à cinq agents, pas plus. Au-delà, le pilote passe plus de temps à coordonner qu'à avancer.
+Three to five agents, no more. Beyond that, the pilot spends more time coordinating than moving.
 
-- **Le pilote.** La session principale qui lit le prompt. Il séquence les lots, ouvre les portes
-  de vérification, ne code pas lui-même les gros lots pour garder son attention sur l'ordonnancement.
-- **Les implémenteurs.** Un par lot indépendant, chacun en contexte frais. La demande de fond est
-  un exécutant capable et appliqué, dont le modèle se règle par le mécanisme propre à la
-  plateforme. Chez Claude Code, ça passe par un profil du plugin, `fstack:developpeur` ou
-  `fstack:expert` selon le lot, le plus bas qui tient le critère de fin. Ailleurs, la même
-  exigence se formule en clair dans le prompt.
-- **Le relecteur.** En contexte frais, il ne voit que le diff produit et les critères de la tâche
-  concernée, jamais l'historique de la conversation qui l'a fait naître. Son mandat s'arrête à ce
-  qui casse la correction du code ou une exigence écrite dans le plan. Le style et la préférence
-  personnelle restent hors de son mandat, sinon il en trouve toujours et l'exécution part en
-  sur-ingénierie pour satisfaire des remarques qui ne comptaient pas.
+- **The pilot.** The main session that reads the prompt. It sequences the batches, opens the
+  verification gates, and does not code the big batches itself so as to keep its attention on
+  scheduling.
+- **The implementers.** One per independent batch, each in a fresh context. The underlying ask is
+  a capable and diligent executor, whose model is set through the platform's own mechanism. In
+  Claude Code, that goes through a plugin profile, `fstack:builder` or `fstack:expert` depending
+  on the batch, the lowest one that meets the end criterion. Elsewhere, the same requirement is
+  stated in plain words in the prompt.
+- **The reviewer.** In a fresh context, it sees only the diff produced and the criteria of the task
+  concerned, never the conversation history that gave birth to it. Its mandate stops at what
+  breaks the correctness of the code or a requirement written in the plan. Style and personal
+  preference stay outside its mandate, otherwise it always finds some and execution drifts into
+  over-engineering to satisfy remarks that did not matter.
 
-## 6. La règle de parallélisme
+## 6. The parallelism rule
 
-Deux lots qui touchent les mêmes fichiers ne partent jamais dans le même tour. Le plan a déjà
-tranché ce découpage dans sa section dédiée, le prompt ne fait que le restater pour que le pilote
-n'ait pas à relire tout le plan pour retrouver l'information au moment d'agir.
+Two batches touching the same files never start in the same turn. The plan has already settled this
+split in its dedicated section, the prompt only restates it so the pilot does not have to reread
+the whole plan to find the information at the moment of acting.
 
-## 7. Les portes de vérification
+## 7. Verification gates
 
-Une porte par étape, reprise du plan. Elles s'écrivent ici, dans le prompt d'exécution, jamais
-dans le skill lui-même. Le skill tourne sur un modèle qui se vérifie déjà de lui-même, lui
-redemander une vérification explicite ne fait que gaspiller des tokens en narration de
-correction. Les implémenteurs, eux, tournent sur un modèle qui gagne à se l'entendre dire, donc
-la consigne « avant de conclure, vérifie que [critère] » se met à chaque étape du prompt.
+One gate per step, taken from the plan. They are written here, in the execution prompt, never in
+the skill itself. The skill runs on a model that already checks itself, asking it again for an
+explicit verification only wastes tokens on correction narration. The implementers run on a model
+that benefits from hearing it, so the instruction "before concluding, check that [criterion]" goes
+in every step of the prompt.
 
-## 8. Ce qui remonte
+## 8. What comes back
 
-Un sous-agent ne renvoie que son résultat final, le pilote ne voit jamais son fil de travail. Le
-prompt demande donc à chaque implémenteur de terminer par un état court, trois lignes : ce qui
-est fait, ce qui reste, ce qui a surpris. Sans cette consigne le pilote enchaîne les lots à
-l'aveugle. Il leur demande aussi de mettre à jour la section Reprise du plan et de cocher les
-étapes à la fin de leur lot. Ce sont les deux seules zones du plan qu'un exécutant modifie, et le
-prompt le dit : les décisions, la conception et les critères ne se réécrivent pas en cours de
-route. Un critère qui se révèle faux remonte au pilote, il ne s'assouplit pas pour devenir vert.
+A subagent returns only its final result, the pilot never sees its working thread. The prompt
+therefore asks each implementer to finish with a short three-line status: `Done`, `Left`,
+`Surprises`. Without this instruction the pilot chains batches blind. It also asks them to update
+the plan's Restart notes section and tick the steps at the end of their batch. Those are the only
+two zones of the plan an executor edits, and the prompt says so: decisions, design and criteria
+are not rewritten along the way. A criterion that turns out to be wrong goes back up to the pilot,
+it is not loosened to turn green.
 
-## 9. Exemple
+## 9. Example
 
-Cas simple, un plan qui ajoute un champ `archived` à un modèle et l'expose dans une route.
+Simple case, a plan that adds an `archived` field to a model and exposes it in a route.
 
 ```
 <plan>
-Lis en entier plans/ajout-champ-archived.md avant de commencer. C'est la source de vérité,
-au-dessus de tout ce qui suit dans ce message.
+Read plans/add-archived-field.md in full before starting. It is the source of truth,
+above everything else in this message.
 </plan>
 
 <decisions>
-1. Le champ s'appelle `archived`, booléen, défaut false. Pas de champ `archivedAt`, la date
-   n'a pas d'usage identifié aujourd'hui.
-2. La route GET filtre les archivés par défaut, un paramètre `?archived=true` les inclut.
+1. The field is called `archived`, boolean, default false. No `archivedAt` field, the date
+   has no identified use today.
+2. The GET route filters out archived items by default, a `?archived=true` parameter includes them.
 </decisions>
 
-<ne_pas_toucher>
-La table `users` et la route d'authentification. Le sujet est le modèle `Task` seul.
-</ne_pas_toucher>
+<off_limits>
+The `users` table and the authentication route. The subject is the `Task` model alone.
+</off_limits>
 
 <invariants>
-La suite de tests existante passe à chaque étape. Aucune migration destructrice, la colonne
-s'ajoute avec un défaut, elle ne remplace rien.
+The existing test suite passes at every step. No destructive migration, the column
+is added with a default, it replaces nothing.
 </invariants>
 
-<equipe>
-Toi, le pilote : tu séquences les deux lots ci-dessous et tu ouvres les portes.
-Implémenteur A : lot migration et modèle, profil fstack:developpeur.
-Implémenteur B : lot route et tests d'intégration, profil fstack:developpeur, démarre
-après le lot A puisqu'il consomme le champ qu'il ajoute.
-Relecteur : profil fstack:relecteur, contexte frais, il voit uniquement le diff final et les critères de la tâche 2 du
-plan. Il ne remonte que ce qui romprait le filtre par défaut ou la migration.
-</equipe>
+<team>
+You, the pilot: you sequence the two batches below and open the gates.
+Implementer A: migration and model batch, profile fstack:builder.
+Implementer B: route and integration tests batch, profile fstack:builder, starts
+after batch A since it consumes the field A adds.
+Reviewer: profile fstack:reviewer, fresh context, it sees only the final diff and the criteria of
+task 2 of the plan. It only reports what would break the default filter or the migration.
+</team>
 
-<etapes>
-1. Lot A : migration et modèle. Avant de conclure, vérifie que la migration s'applique sur une
-   base vide et que le test existant `tests/models/task.test.js` passe toujours.
-2. Lot B : route et tests. Avant de conclure, vérifie que `GET /tasks` masque les archivés par
-   défaut et les inclut avec `?archived=true`.
-3. Relecture du diff complet par le relecteur en contexte frais.
-</etapes>
+<steps>
+1. Batch A: migration and model. Before concluding, check that the migration applies on an
+   empty database and that the existing test `tests/models/task.test.js` still passes.
+2. Batch B: route and tests. Before concluding, check that `GET /tasks` hides archived items by
+   default and includes them with `?archived=true`.
+3. Review of the full diff by the reviewer in a fresh context.
+</steps>
 
-<demarrage>
-Commence par lire plans/ajout-champ-archived.md en entier, puis lance le lot A.
-</demarrage>
+<start>
+Start by reading plans/add-archived-field.md in full, then launch batch A.
+</start>
 ```

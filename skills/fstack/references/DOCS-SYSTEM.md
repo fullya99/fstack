@@ -1,206 +1,202 @@
-# DOCS-SYSTEM : organisation de `docs/`
+# DOCS-SYSTEM: how `docs/` is organised
 
-> `docs/` est la seule zone où la connaissance longue a le droit de vivre. Sa valeur tient à
-> une propriété unique : **tout ce qui s'y trouve est vrai**. Dès qu'on tolère une fiche
-> périmée, le lecteur doit tout revérifier, et la zone entière perd son intérêt.
+> `docs/` is the only zone where long-form knowledge may live. Its value rests on a single
+> property: **everything in it is true**. As soon as a stale page is tolerated, the reader must
+> recheck everything, and the whole zone loses its point.
 
-## Arborescence
+## Tree
 
 ```
 docs/
-├── README.md              # index, la seule porte d'entrée
-├── modules/               # comment marche une brique technique
+├── README.md              # index, the only entry door
+├── modules/               # how a technical building block works
 │   └── <module>.md
-├── features/              # comment marche une capacité vue de l'utilisateur
+├── features/              # how a user-facing capability works
 │   └── <feature>.md
-├── ops/                   # procédures rejouables (setup, deploy, migration, incident)
+├── ops/                   # replayable procedures (setup, deploy, migration, incident)
 │   └── <procedure>.md
-├── pieges/                # pièges qui n'ont pas de module, un registre numéroté
+├── pitfalls/              # pitfalls with no module, a numbered registry
 │   └── README.md
-└── decisions/             # ADR, pourquoi on a tranché comme ça
+└── decisions/             # ADRs, why we decided this way
     └── ADR-0001-<slug>.md
 ```
 
-Les quatre sous-répertoires ne sont pas décoratifs, ils correspondent à quatre questions
-différentes. Une fiche qui hésite entre deux, c'est souvent deux fiches.
+The four subdirectories are not decorative, they match four different questions. A page that
+hesitates between two is often two pages. The directory `docs/pieges/` of an older project is read
+like `docs/pitfalls/`.
 
-| Répertoire | Question | Se périme quand |
+| Directory | Question | Goes stale when |
 |---|---|---|
-| `modules/` | Comment cette brique fonctionne-t-elle ? | le code change |
-| `features/` | Que fait le produit, de bout en bout ? | le comportement change |
-| `ops/` | Comment je refais cette opération ? | l'outillage ou l'infra change |
-| `decisions/` | Pourquoi ce choix ? | jamais, on supersède au lieu de réécrire |
+| `modules/` | How does this building block work? | the code changes |
+| `features/` | What does the product do, end to end? | the behaviour changes |
+| `ops/` | How do I redo this operation? | the tooling or infra changes |
+| `decisions/` | Why this choice? | never, we supersede instead of rewriting |
 
-Sur un petit projet, `modules/` et `features/` peuvent rester à plat dans `docs/`. Tu crées la
-structure quand le volume la justifie, tu ne l'anticipes pas.
-
----
-
-## Qu'est-ce qui mérite une fiche
-
-Documenter tout fait autant de dégâts que ne rien documenter. Le bruit rend le vrai illisible,
-et une fiche qu'on ne maintient pas finit par mentir.
-
-**Une fiche est justifiée si au moins un de ces cas est vrai :**
-
-- plusieurs fichiers coopèrent pour rendre le service, et la logique n'est lisible dans aucun,
-- une API ou un contrat est consommé ailleurs dans le projet,
-- il existe un invariant non évident dans le code, du genre « l'ordre des appels compte » ou
-  « ce cache doit être invalidé avant »,
-- ça a été difficile à faire marcher, et ce qui a coûté du temps une fois en coûtera deux,
-- une opération doit être rejouable par quelqu'un d'autre, ou par toi dans six mois,
-- une décision structurante a été prise entre plusieurs options crédibles.
-
-**Une fiche n'est pas justifiée** si le code est auto-explicatif, si le contenu paraphrase les
-signatures, si la brique est triviale ou jetable, ou si l'information a déjà sa place dans un
-pilier.
-
-Le test qui tranche : retirer cette fiche coûterait-il du temps à quelqu'un ? Si non, elle n'a
-pas à exister.
+On a small project, `modules/` and `features/` can stay flat in `docs/`. Create the structure when
+the volume justifies it, do not anticipate it.
 
 ---
 
-## En-tête de statut, obligatoire
+## What deserves a page
 
-Chaque fiche commence par ce bloc. C'est lui qui permet à un lecteur, humain ou agent, de savoir
-en une ligne s'il peut faire confiance au contenu. Et c'est lui que `ctx-audit.sh` lit pour
-détecter les fiches qui dérivent.
+Documenting everything does as much damage as documenting nothing. Noise makes the true unreadable,
+and a page nobody maintains ends up lying.
+
+**A page is justified if at least one of these holds:**
+
+- several files cooperate to deliver the service, and the logic is readable in none of them,
+- an API or contract is consumed elsewhere in the project,
+- there is a non-obvious invariant in the code, such as "call order matters" or "this cache must
+  be invalidated first",
+- it was hard to get working, and what cost time once will cost it twice,
+- an operation must be replayable by someone else, or by you in six months,
+- a structuring decision was made among several credible options.
+
+**A page is not justified** if the code is self-explanatory, if the content paraphrases the
+signatures, if the building block is trivial or disposable, or if the information already has its
+place in a pillar.
+
+The deciding test: would removing this page cost someone time? If not, it does not need to exist.
+
+---
+
+## Status header, required
+
+Every page starts with this block. It lets a reader, human or agent, know in one line whether the
+content can be trusted. And it is what `ctx-audit.sh` reads to detect drifting pages.
 
 ```markdown
-> **Statut** : ✅ à jour, vérifié le 2026-08-13 contre `src/auth/session.ts`, commit `a1b2c3d`
-> **Type** : module
-> **Portée** : `src/auth/**`, `src/middleware/session.ts`
-> **Voir aussi** : `docs/features/connexion.md`, `docs/decisions/ADR-0003-sessions.md`
+> **Status**: ✅ up to date, verified on 2026-08-13 against `src/auth/session.ts`, commit `a1b2c3d`
+> **Type**: module
+> **Scope**: `src/auth/**`, `src/middleware/session.ts`
+> **See also**: `docs/features/login.md`, `docs/decisions/ADR-0003-sessions.md`
 ```
 
-| Statut | Sens | Suite |
+The French header of an older project (`Statut`, `Portée`) is also read.
+
+| Status | Meaning | Next |
 |---|---|---|
-| `✅ à jour` | vérifié contre le code à la date indiquée | rien à faire |
-| `🟡 à vérifier` | le périmètre a bougé, la fiche n'a pas été relue | à traiter à la prochaine clôture |
-| `🔴 obsolète` | contenu faux ou sujet disparu | direction `archives/`, à la clôture en cours |
+| `✅ up to date` | verified against the code at the stated date | nothing to do |
+| `🟡 to verify` | the scope moved, the page was not re-read | handle at the next debrief |
+| `🔴 obsolete` | false content or vanished subject | moves to `archives/`, at the current debrief |
 
-Le statut est daté et sourcé. La date dit quand, la source dit contre quoi : un fichier, un
-commit, une commande rejouée, une page de documentation avec sa date de consultation. Un statut
-sans source n'est qu'une déclaration, et « vérifié » sans objet ne vaut rien.
+The status is dated and sourced. The date says when, the source says against what: a file, a
+commit, a replayed command, a documentation page with its consultation date. A status without a
+source is only a declaration, and "verified" with no object is worth nothing.
 
-Un `🔴` ne survit pas à une clôture. Un `🟡` qui traîne sur deux clôtures est soit vérifié soit
-archivé, pas laissé en suspens.
+A `🔴` does not survive a debrief. A `🟡` that lingers over two debriefs is either verified or
+archived, not left hanging.
 
-Le champ `Portée` liste les chemins que la fiche décrit. C'est ce qui rend la maintenance
-mécanique. Quand la session touche `src/auth/`, tu sais immédiatement quelles fiches relire.
+The `Scope` field lists the paths the page describes. It makes maintenance mechanical. When the
+session touches `src/auth/`, you know at once which pages to re-read.
 
 ---
 
-## L'index `docs/README.md`
+## The `docs/README.md` index
 
-Une fiche non indexée est une fiche invisible. Personne ne la lira, donc personne ne la
-corrigera. L'index se met à jour dans le même mouvement que la fiche.
+An unindexed page is an invisible page. Nobody reads it, so nobody corrects it. The index is
+updated in the same move as the page.
 
 ```markdown
-| Fiche | Type | Portée | Statut | Vérifié le |
+| Page | Type | Scope | Status | Verified on |
 |---|---|---|---|---|
 | [auth](modules/auth.md) | module | `src/auth/**` | ✅ | 2026-08-13 |
-| [connexion](features/connexion.md) | feature | parcours login | 🟡 | 2026-06-02 |
+| [login](features/login.md) | feature | login flow | 🟡 | 2026-06-02 |
 ```
 
-L'index porte aussi une section « Archivé récemment » qui pointe vers `archives/README.md`. Le
-lecteur qui cherche une fiche disparue doit trouver où elle est partie sans avoir à fouiller.
+The index also carries a "Recently archived" section pointing to `archives/README.md`. A reader
+looking for a vanished page must find where it went without digging.
 
 ---
 
-## Écrire une fiche
+## Writing a page
 
-Commence par la conclusion. Un lecteur qui s'arrête après trois lignes doit déjà avoir
-l'essentiel.
+Start with the conclusion. A reader who stops after three lines must already have the essentials.
 
-Reste court. Un gros document n'est jamais mis à jour, donc il ment. Cible 200 lignes, alerte à
-250, blocage à 300, mesuré par `ctx-audit.sh --budget`.
+Stay short. A big document is never updated, so it lies. Target 200 lines, warning at 250, blocker
+at 300, measured by `ctx-audit.sh --budget`.
 
-Une fiche de module qui gonfle de pièges est souvent une zone qui s'ignore. Quand le module a un
-répertoire, ses pièges vont dans `<zone>/CODEMAP.md`, et la fiche garde le comment et le
-pourquoi. Voir `references/ZONES.md`.
+A module page that swells with pitfalls is often a zone that ignores itself. When the module has a
+directory, its pitfalls go in `<zone>/CODEMAP.md`, and the page keeps the how and the why. See
+`references/ZONES.md`.
 
-Ne paraphrase pas le code. Le code dit quoi, la fiche dit pourquoi, comment ça s'articule, et
-ce qui casse si on y touche.
+Do not paraphrase the code. The code says what, the page says why, how it fits together, and what
+breaks if you touch it.
 
-Sur une fiche déjà longue, une profondeur de titres au-delà de quatre niveaux signale en général
-plusieurs sujets, règle de style de GitLab. `ctx-audit.sh` le signale.
+On an already long page, a heading depth beyond four levels usually signals several subjects, a
+GitLab style rule. `ctx-audit.sh` reports it.
 
-Cite des chemins réels et cliquables comme `src/auth/session.ts:42`, pas des descriptions vagues.
+Cite real, clickable paths such as `src/auth/session.ts:42`, not vague descriptions.
 
-Mets les pièges avant les détails, chacun marqué 🪤 en début de ligne. Le marqueur est ce que
-`ctx-audit.sh` compte et rattache à un propriétaire, voir plus bas.
+Put pitfalls before details, each marked 🪤 at the start of the line. The marker is what
+`ctx-audit.sh` counts and attaches to an owner, see below.
 
-Mets les détails après. La section « à savoir » fait gagner plus de temps que la
-description exhaustive.
+Put details after. The "good to know" section saves more time than the exhaustive description.
 
-Aucun secret. Tu indiques où se trouve une clé, jamais sa valeur.
+No secrets. Say where a key is, never its value.
 
-Les gabarits sont dans `templates/docs/` : `module.md`, `feature.md`, `procedure.md`, `ADR.md`.
+Templates are in `templates/docs/`: `module.md`, `feature.md`, `procedure.md`, `ADR.md`.
 
 ---
 
-## Les pièges, un propriétaire chacun
+## Pitfalls, one owner each
 
-Un piège est ce qui a coûté du temps une fois et en coûtera encore. Il se marque 🪤 et vit chez
-un seul propriétaire.
+A pitfall is what cost time once and will again. It is marked 🪤 and lives with a single owner.
 
-| Le piège concerne | Il vit dans |
+| The pitfall concerns | It lives in |
 |---|---|
-| un module | la fiche `docs/modules/<module>.md` |
-| une zone | la carte `<zone>/CODEMAP.md` |
-| rien d'identifiable, ou le projet entier | `docs/pieges/` si le projet en a un, sinon la section zones sensibles de `CODEMAP.md`, jamais les deux dans un même projet |
+| a module | the page `docs/modules/<module>.md` |
+| a zone | the map `<zone>/CODEMAP.md` |
+| nothing identifiable, or the whole project | `docs/pitfalls/` if the project has one, otherwise the sensitive zones section of `CODEMAP.md`, never both in one project |
 
-`docs/pieges/README.md` tient le registre numéroté, un numéro par piège, monotone, jamais
-réutilisé, comme les ADR.
+`docs/pitfalls/README.md` holds the numbered registry, one number per pitfall, monotonic, never
+reused, like ADRs.
 
 ```markdown
-| N° | Piège | Symptôme | Parade | Statut |
+| No. | Pitfall | Symptom | Workaround | Status |
 |---|---|---|---|---|
-| P-003 | 🪤 le cache survit au redémarrage | données de la veille servies | purger `var/cache` avant le test | actif |
+| P-003 | 🪤 the cache survives a restart | yesterday's data served | purge `var/cache` before the test | active |
 ```
 
-Un piège corrigé à la source passe en `résolu le <date>` dans le registre, il ne disparaît pas.
-Un piège laissé dans `TODOS.md` est perdu avec le bloc de reprise, l'audit le signale. `CLAUDE.md`
-n'est pas un propriétaire de piège, sauf règle de conduite qui vaut pour tout le projet.
+A pitfall fixed at the source becomes `resolved on <date>` in the registry, it does not disappear.
+A pitfall left in `TODOS.md` is lost with the resume block, the audit reports it. `CLAUDE.md` is
+not a pitfall owner, except for a conduct rule that holds for the whole project.
 
 ---
 
-## ADR, les décisions
+## ADRs, decisions
 
-Un ADR capture une décision structurante : contexte, options envisagées, choix retenu,
-conséquences.
+An ADR captures a structuring decision: context, options considered, chosen option, consequences.
 
-Numérotation monotone, jamais réutilisée, du genre `ADR-0007-choix-file-attente.md`.
+Monotonic numbering, never reused, such as `ADR-0007-queue-choice.md`.
 
-Statuts possibles : `Proposé`, puis `Accepté`, puis `Superseded par ADR-00NN` ou `Déprécié`.
+Possible statuses: `Proposed`, then `Accepted`, then `Superseded by ADR-00NN` or `Deprecated`.
 
-**Un ADR accepté ne se réécrit pas.** Si la décision change, tu écris un nouvel ADR qui supersède
-l'ancien, et tu marques l'ancien. C'est ce qui permet de comprendre plus tard combien de temps
-une décision a gouverné le projet.
+**An accepted ADR is not rewritten.** If the decision changes, write a new ADR that supersedes the
+old one, and mark the old one. This is what lets you understand later how long a decision governed
+the project.
 
-Conséquence directe, **les ADR supersédés ne partent pas en `archives/`**. Ils restent en place,
-marqués. Leur valeur vient justement d'avoir été vrais à une époque. C'est la seule exception à
-la règle d'archivage.
+Direct consequence, **superseded ADRs do not go to `archives/`**. They stay in place, marked. Their
+value comes precisely from having been true at some point. It is the only exception to the archiving
+rule.
 
-Un ADR tient sur une page. Le matériel de support va ailleurs, en lien.
+An ADR fits on one page. Supporting material goes elsewhere, linked.
 
-Ce qui mérite un ADR : ce qui est coûteux à inverser, ce qui a fait l'objet d'un vrai arbitrage,
-ce qui surprendra un lecteur futur. Pas les choix évidents, pas ceux qu'on annule en dix minutes.
+What deserves an ADR: what is costly to reverse, what went through a real trade-off, what will
+surprise a future reader. Not obvious choices, not those undone in ten minutes.
 
 ---
 
-## Maintenance à la clôture
+## Maintenance at debrief
 
-Pour chaque zone touchée par la session :
+For each zone touched by the session:
 
-1. Liste les fiches dont la `Portée` recoupe les fichiers modifiés. `ctx-audit.sh` le fait pour toi.
-2. Chaque fiche recoupée est **relue**, pas seulement redatée. Redater sans relire, c'est la
-   façon la plus rapide de transformer `docs/` en piège.
-3. Corrige, puis passe en `✅ à jour, vérifié le <aujourd'hui>`. Si le sujet a disparu, la fiche
-   part par `$SKILL/scripts/ctx-archive.sh`, qui vérifie les références entrantes avant de
-   déplacer.
-4. Crée les fiches manquantes pour ce qui remplit un des critères plus haut.
-5. Remets `docs/README.md` en cohérence.
-6. Chaque fiche au-dessus de 250 lignes se scinde en deux sujets, ou sort son récit vers
-   `archives/` s'il ne sert plus à décider.
+1. List the pages whose `Scope` overlaps the modified files. `ctx-audit.sh` does it for you.
+2. Each overlapping page is **re-read**, not just redated. Redating without reading is the fastest
+   way to turn `docs/` into a pitfall.
+3. Fix, then set `✅ up to date, verified on <today>`. If the subject is gone, the page leaves via
+   `$SKILL/scripts/ctx-archive.sh`, which checks incoming references before moving.
+4. Create the missing pages for whatever meets one of the criteria above.
+5. Bring `docs/README.md` back in line.
+6. Every page above 250 lines is split into two subjects, or moves its narrative to `archives/` if
+   it no longer helps decide.

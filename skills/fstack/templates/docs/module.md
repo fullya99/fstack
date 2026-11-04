@@ -1,52 +1,52 @@
-> **Statut** : ✅ à jour, vérifié le {{DATE}}
-> **Type** : module
-> **Portée** : `<chemin/**>`, `<autre/fichier>`
-> **Voir aussi** : `docs/features/<...>.md`, `docs/decisions/ADR-00NN-<...>.md`
+> **Status**: ✅ up to date, checked on {{DATE}}
+> **Type**: module
+> **Scope**: `<path/**>`, `<other/file>`
+> **See also**: `docs/features/<...>.md`, `docs/decisions/ADR-00NN-<...>.md`
 
-# Module, <nom>
+# Module, <name>
 
-**Rôle** : <ce que fait cette brique, en une ou deux phrases. L'essentiel d'abord, un lecteur
-qui s'arrête ici doit déjà avoir compris.>
+**Role**: <what this brick does, in one or two sentences. The essential first, a reader who
+stops here must already have understood.>
 
-## Où ça vit
+## Where it lives
 
-| Fichier | Rôle |
+| File | Role |
 |---|---|
-| `<chemin>` | <une ligne> |
+| `<path>` | <one line> |
 
 ## Interface
 
-<Ce que le reste du projet consomme : fonctions, classes, endpoints, événements, CLI. Les
-signatures exactes vivent dans le code, ici tu dis à quoi ça sert et comment on s'en sert.>
+<What the rest of the project consumes: functions, classes, endpoints, events, CLI. Exact
+signatures live in the code, here you say what it is for and how it is used.>
 
-| Élément | Signature ou forme | Usage |
+| Element | Signature or shape | Use |
 |---|---|---|
-| `<nom>` | `<forme>` | <quand l'appeler> |
+| `<name>` | `<shape>` | <when to call it> |
 
-## Fonctionnement
+## How it works
 
-<Comment ça marche à l'intérieur, uniquement pour ce qui ne se lit pas dans le code : ordre des
-étapes, état conservé, cas particuliers structurants.>
+<How it works inside, only for what cannot be read in the code: order of steps, state kept,
+structuring special cases.>
 
-## Invariants, ce qui casse si on y touche
+## Invariants, what breaks if you touch it
 
-- <règle non évidente que le code suppose vraie>
-- <dépendance d'ordre, contrat implicite, effet de bord>
+- <non-obvious rule the code assumes true>
+- <order dependency, implicit contract, side effect>
 
-## Pièges
+## Pitfalls
 
-- <symptôme observé> → <cause réelle> → <ce qu'il faut faire>
+- <observed symptom> → <real cause> → <what to do>
 
-## Dépendances
+## Dependencies
 
-- **Utilise** : `<module ou service>`, <pour quoi faire>
-- **Utilisé par** : `<module>`, <pour quoi faire>
+- **Uses**: `<module or service>`, <for what>
+- **Used by**: `<module>`, <for what>
 
 ## Tests
 
-| Quoi | Où | Commande |
+| What | Where | Command |
 |---|---|---|
-| <cas couverts> | `<chemin>` | `<cmd>` |
+| <cases covered> | `<path>` | `<cmd>` |
 
-**Non couvert** : <ce qu'aucun test ne protège. C'est souvent l'information la plus utile de
-la fiche.>
+**Not covered**: <what no test protects. It is often the most useful information in the
+page.>
