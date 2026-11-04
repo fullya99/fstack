@@ -24,13 +24,25 @@ Sans témoin, le hook signale une clôture peut-être oubliée quand l'arbre por
 commités ou plus et que le CHANGELOG n'a pas d'entrée d'hier ou du jour. Dis-le avant toute autre
 chose : la reprise part alors d'un bloc qui ne décrit pas le dépôt.
 
-**Le prompt rangé (`/fstack:relance open`).** Si le hook annonce « un prompt de relance
-attend », la clôture précédente l'a écrit pour toi. Lis-le par la commande de la rubrique « Témoin
-de clôture et prompt de relance » du `SKILL.md`. La première ligne dit quand et à quel commit il a été produit, et
-combien de commits sont arrivés depuis. Zéro commit : il fait foi, suis son démarrage. Des
-commits depuis : lis-les (`git log --oneline <commit>..HEAD`) avant de suivre le prompt, ils
-peuvent avoir fait ou défait sa prochaine étape. Une fois lu, il est marqué joué et le hook ne
+**La file de prompts (`/fstack:relance open`).** Le hook annonce les prompts qui attendent. Deux
+sortes d'entrées : `reprise`, écrite par la dernière clôture, et `plan-<slug>`, une par plan, écrite
+par le mode planifier. Lis la prochaine par la commande de la rubrique « Témoin de clôture et
+prompt de relance » du `SKILL.md`. La reprise passe d'abord, elle décrit l'état le plus frais.
+Viennent ensuite les plans dans l'ordre où ils ont été rangés, sauf un plan dont la dépendance
+attend encore. Un nom donné à `open` (`open plan-x`, ou `open x`) joue cette entrée-là.
+
+La première ligne de la sortie dit quand et à quel commit le prompt a été produit, et combien de
+commits sont arrivés depuis. Zéro commit : il fait foi, suis son démarrage. Des commits depuis :
+lis-les (`git log --oneline <commit>..HEAD`) avant de suivre le prompt, ils peuvent avoir fait ou
+défait sa prochaine étape. Pour un plan, elle dit aussi si le fichier du plan a changé depuis le
+rangement ou s'il a disparu. Modifié : relis le plan avant le prompt, c'est le plan qui fait foi.
+Introuvable : n'exécute rien et dis-le. Une fois lue, l'entrée est marquée jouée et le hook ne
 l'annonce plus.
+
+**Un plan par session.** Le prompt d'un plan pilote toute la session. Une fois ce plan fini ou
+interrompu, d'autres entrées peuvent rester dans la file. On ne les enchaîne pas : on clôture,
+puis on redémarre le contexte et on relance `open`. Après une reprise, qui ne charge presque
+rien, jouer le plan suivant dans la même session reste possible.
 
 ## 2. Lire dans cet ordre, et pas plus
 
@@ -100,7 +112,9 @@ l'état réel lu, jamais inventé :
 3. **Règles** : un renvoi vers `CLAUDE.md` et les règles du projet, pas leur copie. Les contraintes
    propres à la tâche (accès, ressource externe fragile) s'ajoutent, une ligne chacune.
 4. **Démarrage** : la ligne `Vérifier le terrain` du bloc, puis la prochaine étape, puis « si une
-   hypothèse est ambiguë, demande avant d'agir ».
+   hypothèse est ambiguë, demande avant d'agir ». Si des plans attendent dans la file et que la
+   prochaine étape est l'un d'eux, elle s'écrit « `/fstack:relance open plan-<slug>` » au lieu
+   de redécrire le plan.
 
 Trois règles valent pour tout le prompt :
 

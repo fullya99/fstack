@@ -16,9 +16,9 @@ deux skills sur le même cycle se disputent le déclenchement.
 | Commande | Quand |
 |---|---|
 | `/fstack:init` | Une fois, pour installer la convention dans un projet |
-| `/fstack:planifier` | Pour cadrer une idée en plan sourcé et en prompt d'exécution |
-| `/fstack:cloture` | En fin de session, avant un `/clear`. Range le prompt de la session suivante, sauf avec `sans-relance` |
-| `/fstack:relance` | Après un `/clear`, pour retrouver le fil en dix lignes. `open` joue le prompt rangé par la clôture |
+| `/fstack:planifier` | Pour cadrer une idée en plan sourcé. Son prompt d'exécution part dans la file de relance, un par plan, plusieurs plans par session si besoin |
+| `/fstack:cloture` | En fin de session, avant un `/clear`. Range la reprise de la session suivante, sauf avec `sans-relance`, sans toucher aux prompts de plan |
+| `/fstack:relance` | Après un `/clear`, pour retrouver le fil en dix lignes. `open` joue la prochaine entrée de la file, la reprise d'abord puis les plans dans l'ordre, `open <plan>` en choisit une |
 | `/fstack:audit` | Pour vérifier `CLAUDE.md` et `AGENTS.md` contre le code et les raccourcir |
 | `/fstack:migrer` | Pour remettre une ancienne convention à jour, sur une branche, en simulation d'abord |
 

@@ -233,7 +233,12 @@ porte ni état ni récit.
    range-le pour la session suivante par la commande de la rubrique « Témoin de clôture et prompt de relance » du
    `SKILL.md`. Le hook l'annoncera au prochain démarrage avec sa fraîcheur, et
    `/fstack:relance open` le jouera. Hors Claude Code, rien n'est rangé et le prompt reste
-   dans le compte rendu.
+   dans le compte rendu. Ce prompt remplace la reprise précédente, jamais le prompt d'un plan.
+   Avant de le rédiger, liste la file (`--lister-relance`, même rubrique) : si la prochaine
+   étape est un plan qui attend, le démarrage du prompt renvoie vers son entrée. Un plan que
+   la session a exécuté sans passer par la file garde son entrée en attente : solde-la
+   (`--solder <entrée>`, même rubrique) pour qu'elle ne se rejoue pas, et dis-le dans le compte
+   rendu.
 
 ## Phase 8. Compte rendu
 

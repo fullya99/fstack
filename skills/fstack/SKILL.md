@@ -77,10 +77,23 @@ FIN_RELANCE_7Q3
 Le délimiteur est entre apostrophes, donc `$` et accents graves passent tels quels. S'il apparaît
 seul sur une ligne du prompt, le reste serait exécuté comme des commandes : change-le.
 
-À la reprise (`/fstack:relance open`), lire le prompt rangé, qui est ensuite marqué joué :
+En fin de mode planifier, le prompt d'un plan, une entrée par plan qui n'écrase pas la reprise.
+`--apres <plan>` si ce plan consomme ce qu'un autre livre :
+
+```bash
+bash "$SKILL/scripts/ctx-demarrage.sh" --ecrire-relance --plan plans/<slug>.md --donnees "${CLAUDE_PLUGIN_DATA}" <<'FIN_RELANCE_7Q3'
+<le prompt d'exécution, rédigé selon references/plan/PROMPT.md>
+FIN_RELANCE_7Q3
+```
+
+À la reprise (`/fstack:relance open`), lire la prochaine entrée de la file (la reprise d'abord,
+puis les plans dans l'ordre), qui est ensuite marquée jouée. `--nom <entrée>` en choisit une.
+`--lister-relance` montre la file sans rien jouer, `--solder <entrée>` marque jouée une entrée
+exécutée par un autre chemin :
 
 ```bash
 bash "$SKILL/scripts/ctx-demarrage.sh" --lire-relance --donnees "${CLAUDE_PLUGIN_DATA}"
+bash "$SKILL/scripts/ctx-demarrage.sh" --lister-relance --donnees "${CLAUDE_PLUGIN_DATA}"
 ```
 
 ## Après un compactage

@@ -146,20 +146,45 @@ Bloquant ou Majeur sans décision écrite, les interfaces se bouclent dans les d
 
 ### Phase 5. Le prompt
 
-Un seul bloc copiable dans le chat, jamais dans un fichier. Il s'adresse à une session neuve,
-sans résidu de l'exploration, ce que chaque plateforme permet à sa façon (chez Claude Code, une
-nouvelle session ou `/clear`). Ordre, contexte long d'abord : le plan à lire en entier, les
-décisions verrouillées restatées, ce qu'on ne touche pas, les invariants, l'équipe, les étapes
-avec leur porte de vérification, le démarrage en dernier. Balises `<plan>`, `<decisions>`,
+Un seul bloc, jamais dans un fichier du projet. Il s'adresse à une session neuve, sans résidu
+de l'exploration, ce que chaque plateforme permet à sa façon (chez Claude Code, une nouvelle
+session ou `/clear`). Ordre, contexte long d'abord : le plan à lire en entier, les décisions
+verrouillées restatées, ce qu'on ne touche pas, les invariants, l'équipe, les étapes avec leur
+porte de vérification, le démarrage en dernier. Balises `<plan>`, `<decisions>`,
 `<ne_pas_toucher>`, `<invariants>`, `<equipe>`, `<etapes>`, `<demarrage>`.
 
 L'équipe reprend les profils du découpage. Anatomie, formulation et exemple dans
 `references/plan/PROMPT.md`.
 
+**Le prompt va dans la file de relance, pas dans le chat.** Chez Claude Code, tu le ranges par la
+commande « prompt d'un plan » de la rubrique « Témoin de clôture et prompt de relance » du
+`SKILL.md`, avec le chemin du plan. Il prend place à côté de la reprise de clôture sans l'écraser,
+le hook l'annonce au prochain démarrage et `/fstack:relance open` le joue. Le chat ne reçoit
+qu'une ligne : le nom de l'entrée et la consigne « redémarre le contexte, puis
+`/fstack:relance open` ». Le bloc ne s'affiche en entier que si l'opérateur le demande, ou si
+le script répond qu'il n'a rien rangé (`CLAUDE_PLUGIN_DATA` absent, autre plateforme).
+
 **Plateformes sans prompt à coller.** Elles lisent le plan lui-même. La section Reprise du plan
 suffit alors à redémarrer, le prompt de la phase 5 est facultatif.
 
-**Fin de phase** : le bloc est dans le chat, ses sept balises sont présentes.
+**Fin de phase** : le script a répondu « range dans la file de relance » avec le nom de l'entrée,
+ou le bloc est dans le chat, et ses sept balises sont présentes.
+
+## Plusieurs plans dans la même session
+
+Chaque plan passe ses six phases et finit dans sa propre entrée de la file. Le plan suivant
+repart de la phase 0. La recherche et l'exploration déjà faites se réutilisent quand elles
+couvrent le sujet, les questions de la phase 3 se reposent pour lui seul.
+
+- **Un plan, une session d'exécution.** Le prompt d'un plan ne pilote que ce plan. Jamais un
+  prompt qui enchaîne deux plans : la session d'exécution chargerait les deux et perdrait le
+  bénéfice du contexte neuf.
+- **L'ordre.** La file joue les plans dans l'ordre où ils ont été rangés. Un plan qui consomme ce
+  qu'un autre livre se range avec `--apres <plan>` : tant que l'autre attend, il passe son tour.
+  Le plan l'écrit dans sa section État actuel, avec ce qu'il attend de l'autre.
+- **Aucun fichier commun sans le dire.** Deux plans qui touchent les mêmes fichiers se rangent en
+  dépendance, jamais côte à côte. La vérification `comm -12` de la phase 4 vaut aussi entre plans.
+- **Le compte rendu final** liste les entrées rangées, dans l'ordre où elles se joueront.
 
 ## Reprise, tenue par l'exécutant
 
@@ -176,7 +201,8 @@ le demande en clair dans chaque étape.
 - ❌ Aucune affirmation « ces lots ne partagent aucun fichier » sans la liste réelle des fichiers.
 - ❌ Aucun plan rendu avec un constat Bloquant ou Majeur sans décision écrite.
 - ❌ Aucun outil MCP en prérequis, on dégrade et on le dit dans le plan.
-- ❌ Aucun commit, aucun push. Ce mode ne modifie aucun fichier hors du plan.
+- ❌ Aucun commit, aucun push. Ce mode ne modifie aucun fichier du projet hors du plan. La file
+  de relance vit hors du dépôt.
 - ❌ Aucun plan en dehors du projet.
 
 ## Références, à charger au besoin

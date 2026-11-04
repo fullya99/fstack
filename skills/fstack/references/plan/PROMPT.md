@@ -2,9 +2,14 @@
 
 ## 1. La forme
 
-Un seul bloc de texte copiable, produit dans le chat, jamais écrit dans un fichier. L'opérateur le
-colle dans une session neuve, sans résidu de l'exploration qui précède. Chaque plateforme a sa façon d'en ouvrir une, chez
+Un seul bloc de texte, jamais écrit dans un fichier du projet. Il est joué dans une session neuve,
+sans résidu de l'exploration qui précède. Chaque plateforme a sa façon d'en ouvrir une, chez
 Claude Code une nouvelle session ou `/clear`.
+
+Chez Claude Code, le bloc se range dans la file de relance, une entrée par plan, et
+`/fstack:relance open` le joue après le redémarrage. Ailleurs, il est produit dans le chat et
+l'opérateur le colle. Dans les deux cas il se suffit à lui-même : il ne suppose ni la reprise de
+clôture ni le prompt d'un autre plan.
 
 ## 2. L'ordre des morceaux
 

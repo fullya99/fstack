@@ -6,7 +6,12 @@
 #   bash ctx-demarrage.sh                    au demarrage : imprime quinze lignes au plus
 #   bash ctx-demarrage.sh --ecrire-temoin    a la fin d'une cloture : ecrit le temoin
 #   bash ctx-demarrage.sh --ecrire-relance   lit un prompt de relance sur stdin et le range
-#   bash ctx-demarrage.sh --lire-relance     imprime le prompt range, avec sa fraicheur, et le marque joue
+#   bash ctx-demarrage.sh --lire-relance     imprime le prochain prompt de la file, avec sa fraicheur, et le marque joue
+#   bash ctx-demarrage.sh --lister-relance   montre la file sans rien jouer
+#   bash ctx-demarrage.sh --solder <entree>  marque une entree jouee sans l'imprimer
+#   --plan <chemin>      avec --ecrire-relance : le prompt d'execution de ce plan, range a cote de la reprise
+#   --apres <entree>     avec --plan : ce plan se joue apres celui-la
+#   --nom <entree>       avec --lire-relance : joue cette entree plutot que la prochaine
 #   --racine <chemin>    projet a lire, sinon $CLAUDE_PROJECT_DIR, sinon le repertoire courant
 #   --donnees <dossier>  dossier de donnees du plugin, sinon $CLAUDE_PLUGIN_DATA
 #
@@ -28,9 +33,9 @@
 # Skill content lifecycle, lue le 2026-11-02) : le hook rappelle de relire le fichier du mode.
 #
 # Le temoin : <donnees>/temoins/<nom stable>, lignes `cle=valeur` (commit, arbre, sale, date).
-# Le prompt de relance : <donnees>/relance/<nom stable>.md, premiere ligne
-# `<!-- relance commit=<sha> date=<AAAA-MM-JJ> -->`. Une fois lu par --lire-relance, il devient
-# <nom stable>.joue.md et le hook ne l'annonce plus.
+# Les prompts de relance : une file dans <donnees>/relance/<nom stable>/, decrite au-dessus de
+# dossier_relance(). Une entree lue par --lire-relance devient <entree>.joue.md et le hook ne
+# l'annonce plus.
 # Le nom stable est le nom du dossier du projet, assaini, plus une somme de son chemin absolu :
 # ni `/` ni espace, et deux clones du meme nom ne se melangent pas.
 # Les variables CLAUDE_PLUGIN_* n'existent pas dans l'outil Bash : le mode cloture passe
@@ -202,13 +207,119 @@ FIN
   return 0
 }
 
-fichier_relance() { # <racine> <donnees> [joue]
-  printf '%s/relance/%s%s.md\n' "$2" "$(nom_projet "$1")" "${3:+.joue}"
+# --- la file de relance -------------------------------------------------------------------
+# Un dossier par projet, <donnees>/relance/<nom stable>/, une entree par fichier :
+#   reprise.md       le prompt de la cloture (ou de /fstack:relance prompt), un seul, reecrit
+#   plan-<slug>.md   le prompt d'execution d'un plan, un par plan, range par le mode planifier
+# Une entree jouee devient <entree>.joue.md. Premiere ligne de chaque entree :
+#   <!-- relance commit=<sha> date=<AAAA-MM-JJ> ordre=<n> [plan=<chemin> empreinte=<cksum>] [apres=<entree>] -->
+# Ordre de jeu : la reprise d'abord, elle decrit l'etat le plus frais et sait ce qui attend.
+# Puis les plans dans l'ordre d'ecriture, un plan dont la dependance attend encore passe son tour.
+
+dossier_relance() { # <racine> <donnees>
+  printf '%s/relance/%s\n' "$2" "$(nom_projet "$1")"
   return 0
 }
 
-ecrire_relance() { # <racine> <donnees> : le prompt arrive sur stdin
-  local racine="$1" donnees="$2" dest commit contenu
+champ_tete() { # <fichier> <cle> : valeur d'un champ de la premiere ligne
+  sed -n '1p' "$1" | sed -n "s/.* $2=\([^ ]*\).*/\1/p"
+  return 0
+}
+
+empreinte_fichier() { # <fichier>
+  cksum < "$1" | cut -d' ' -f1
+  return 0
+}
+
+assainir() { # <texte> : rien d'autre que lettres, chiffres, point, tiret et souligne
+  printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '-'
+  return 0
+}
+
+# Le nom d'une entree depuis ce qu'on tape (--nom, --apres) : reprise, plan-x, x ou plans/x.md.
+# Toujours assaini : il entre dans un nom de fichier et dans l'en-tete.
+nom_entree() { # <saisie>
+  local s="$1"
+  case "$s" in
+    */*|*.md) s="${s##*/}"; s="plan-${s%.md}" ;;
+    reprise|plan-*) ;;
+    *) s="plan-$s" ;;
+  esac
+  printf '%s\n' "$(assainir "$s")"
+  return 0
+}
+
+# Le nom d'entree d'un plan range : plan-<nom du fichier>, jamais `reprise`. Si ce nom est deja
+# pris par un autre plan (meme nom de fichier, autre dossier), le chemin entier le distingue.
+nom_plan() { # <dossier de la file> <chemin relatif du plan>
+  local n autre f
+  n="plan-$(assainir "$(basename "$2" .md)")"
+  for f in "$1/$n.md" "$1/$n.joue.md"; do
+    [ -f "$f" ] || continue
+    autre="$(champ_tete "$f" plan)"
+    if [ -n "$autre" ] && [ "$autre" != "$2" ]; then
+      n="plan-$(assainir "${2%.md}")"
+      break
+    fi
+  done
+  printf '%s\n' "$n"
+  return 0
+}
+
+# L'ancien emplacement, un fichier unique <nom stable>.md a cote du dossier, devient sa reprise.
+migrer_ancien() { # <racine> <donnees>
+  local d
+  d="$(dossier_relance "$1" "$2")"
+  [ -f "$d.md" ] || [ -f "$d.joue.md" ] || return 0
+  mkdir -p "$d" 2>/dev/null || return 0
+  if [ -f "$d.md" ] && [ ! -f "$d/reprise.md" ]; then mv -f "$d.md" "$d/reprise.md" 2>/dev/null; fi
+  if [ -f "$d.joue.md" ] && [ ! -f "$d/reprise.joue.md" ]; then mv -f "$d.joue.md" "$d/reprise.joue.md" 2>/dev/null; fi
+  return 0
+}
+
+# Les entrees en attente, une par ligne, dans l'ordre de jeu (la reprise d'abord).
+en_attente() { # <dossier>
+  local f n o
+  [ -d "$1" ] || return 0
+  find "$1" -maxdepth 1 -type f -name '*.md' ! -name '*.joue.md' 2>/dev/null | while IFS= read -r f; do
+    n="${f##*/}"
+    n="${n%.md}"
+    o="$(champ_tete "$f" ordre)"
+    [ "$n" = reprise ] && o=0
+    case "$o" in ''|*[!0-9]*) o=0 ;; esac
+    printf '%s\t%s\n' "$o" "$n"
+  done | sort -t "$(printf '\t')" -k1,1n -k2,2 | cut -f2
+  return 0
+}
+
+# La dependance d'une entree, si elle attend encore. Vide sinon.
+dependance_en_attente() { # <dossier> <entree>
+  local a
+  a="$(champ_tete "$1/$2.md" apres)"
+  if [ -n "$a" ] && [ -f "$1/$a.md" ]; then printf '%s\n' "$a"; fi
+  return 0
+}
+
+# La prochaine entree a jouer : la premiere dont la dependance n'attend plus, sinon la premiere.
+prochaine_entree() { # <dossier>
+  local liste n
+  liste="$(en_attente "$1")"
+  [ -n "$liste" ] || return 0
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    if [ -z "$(dependance_en_attente "$1" "$n")" ]; then
+      printf '%s\n' "$n"
+      return 0
+    fi
+  done <<FIN
+$liste
+FIN
+  printf '%s\n' "$liste" | sed -n '1p'
+  return 0
+}
+
+ecrire_relance() { # <racine> <donnees> <plan> <apres> : le prompt arrive sur stdin
+  local racine="$1" donnees="$2" plan="$3" apres="$4" dossier nom dest commit contenu ordre tete n
   contenu="$(head -c 20001)"
   if [ "${#contenu}" -gt 20000 ]; then
     contenu="${contenu:0:20000}"
@@ -222,23 +333,63 @@ ecrire_relance() { # <racine> <donnees> : le prompt arrive sur stdin
     ligne "Prompt de relance non range : rien recu sur stdin."
     return 0
   fi
+  nom=reprise
+  if [ -n "$plan" ]; then
+    case "$plan" in "$racine"/*) plan="${plan#"$racine"/}" ;; esac
+    plan="${plan#./}"
+    case "$plan" in
+      /*|*..*|*[!A-Za-z0-9._/-]*)
+        ligne "Prompt de plan non range : le chemin $plan doit etre relatif au projet, sans espace ni '..'."
+        return 0
+        ;;
+    esac
+    if [ ! -f "$racine/$plan" ]; then
+      ligne "Prompt de plan non range : $plan introuvable dans le projet. Ecris le plan avant son prompt."
+      return 0
+    fi
+  fi
+  migrer_ancien "$racine" "$donnees"
+  dossier="$(dossier_relance "$racine" "$donnees")"
+  [ -n "$plan" ] && nom="$(nom_plan "$dossier" "$plan")"
+  dest="$dossier/$nom.md"
+  if ! mkdir -p "$dossier" 2>/dev/null; then
+    ligne "Prompt de relance non range : $dossier n'est pas accessible en ecriture."
+    return 0
+  fi
+  # Un plan reecrit garde sa place dans la file, un nouveau prend la suivante.
+  ordre=""
+  [ -f "$dest" ] && ordre="$(champ_tete "$dest" ordre)"
+  case "$ordre" in ''|*[!0-9]*)
+    ordre="$(find "$dossier" -maxdepth 1 -type f -name '*.md' 2>/dev/null | while IFS= read -r f; do champ_tete "$f" ordre; done \
+             | grep -E '^[0-9]+$' | sort -n | sed -n '$p')"
+    ordre=$(( ${ordre:-0} + 1 ))
+    ;;
+  esac
   commit="$(git -C "$racine" rev-parse -q --verify HEAD 2>/dev/null || true)"
-  dest="$(fichier_relance "$racine" "$donnees")"
-  if mkdir -p "$donnees/relance" 2>/dev/null \
-     && printf '<!-- relance commit=%s date=%s -->\n%s\n' "${commit:-aucun}" "$(ctx_aujourdhui)" "$contenu" > "$dest" 2>/dev/null; then
-    rm -f "$(fichier_relance "$racine" "$donnees" joue)" 2>/dev/null
-    ligne "Prompt de relance range pour la prochaine session : $dest"
+  tete="<!-- relance commit=${commit:-aucun} date=$(ctx_aujourdhui) ordre=$ordre"
+  [ -n "$plan" ] && tete="$tete plan=$plan empreinte=$(empreinte_fichier "$racine/$plan")"
+  [ -n "$plan" ] && [ -n "$apres" ] && tete="$tete apres=$(nom_entree "$apres")"
+  tete="$tete -->"
+  if printf '%s\n%s\n' "$tete" "$contenu" > "$dest" 2>/dev/null; then
+    rm -f "$dossier/$nom.joue.md" 2>/dev/null
+    if [ -n "$plan" ]; then
+      n="$(en_attente "$dossier" | wc -l | tr -d ' ')"
+      ligne "Prompt d'execution de $plan range dans la file de relance sous le nom $nom ($n en attente). Apres le redemarrage de contexte : /fstack:relance open."
+    else
+      ligne "Prompt de relance range pour la prochaine session : $dest"
+    fi
   else
-    ligne "Prompt de relance non range : $donnees/relance n'est pas accessible en ecriture."
+    ligne "Prompt de relance non range : $dossier n'est pas accessible en ecriture."
   fi
   return 0
 }
 
 # Fraicheur d'un prompt range, en une phrase.
 fraicheur_relance() { # <racine> <fichier>
-  local racine="$1" f="$2" tete pc pd e d c7 phrase
+  local racine="$1" f="$2" tete pc pd pp pe e d c7 phrase
   tete="$(sed -n '1p' "$f")"
-  pc="$(sed -n 's/.*commit=\([0-9a-f]*\).*/\1/p' <<<"$tete")"
+  # Sept caracteres hexadecimaux au moins : `commit=aucun` commence par un `a`.
+  pc="$(sed -n 's/.*commit=\([0-9a-f]\{7,\}\).*/\1/p' <<<"$tete")"
   pd="$(sed -n 's/.*date=\([0-9-]*\).*/\1/p' <<<"$tete")"
   c7="$(printf '%s' "$pc" | cut -c1-7)"
   if [ -z "$pc" ]; then
@@ -255,34 +406,103 @@ fraicheur_relance() { # <racine> <fichier>
   if [ -n "$d" ] && [ "$d" -gt 14 ]; then
     phrase="$phrase, il y a $d jours, peut-etre perime"
   fi
+  # Le plan n'est pas encore commite quand son prompt se range : le commit ne le couvre pas.
+  pp="$(champ_tete "$f" plan)"
+  pe="$(champ_tete "$f" empreinte)"
+  if [ -n "$pp" ]; then
+    if [ ! -f "$racine/$pp" ]; then
+      phrase="$phrase, plan introuvable : $pp"
+    elif [ -n "$pe" ] && [ "$pe" != "$(empreinte_fichier "$racine/$pp")" ]; then
+      phrase="$phrase, $pp modifie depuis"
+    fi
+  fi
   printf '%s\n' "$phrase"
   return 0
 }
 
 annoncer_relance() { # <racine> <donnees>
-  local f
+  local dossier liste n nom dep i=0 prochain
   [ -n "$2" ] || return 0
-  f="$(fichier_relance "$1" "$2")"
-  [ -f "$f" ] || return 0
-  ligne "Un prompt de relance attend ($(fraicheur_relance "$1" "$f")). /fstack:relance open pour le reprendre."
+  migrer_ancien "$1" "$2"
+  dossier="$(dossier_relance "$1" "$2")"
+  liste="$(en_attente "$dossier")"
+  [ -n "$liste" ] || return 0
+  n="$(printf '%s\n' "$liste" | wc -l | tr -d ' ')"
+  if [ "$n" -eq 1 ]; then
+    ligne "Un prompt de relance attend ($liste, $(fraicheur_relance "$1" "$dossier/$liste.md")). /fstack:relance open pour le reprendre."
+    return 0
+  fi
+  prochain="$(prochaine_entree "$dossier")"
+  ligne "$n prompts de relance attendent. /fstack:relance open joue $prochain, /fstack:relance open <nom> en choisit un :"
+  while IFS= read -r nom; do
+    [ -n "$nom" ] || continue
+    i=$((i + 1))
+    [ "$i" -le 4 ] || continue
+    dep="$(dependance_en_attente "$dossier" "$nom")"
+    ligne "  $nom : $(fraicheur_relance "$1" "$dossier/$nom.md")${dep:+, apres $dep}"
+  done <<FIN
+$liste
+FIN
+  [ "$n" -gt 4 ] && ligne "  et $((n - 4)) autre(s)"
+  return 0
+}
+
+# Marque une entree jouee sans l'imprimer : un plan execute autrement que par la file.
+solder_relance() { # <racine> <donnees> <entree>
+  local racine="$1" donnees="$2" nom dossier
+  [ -n "$donnees" ] || { ligne "Rien a solder : CLAUDE_PLUGIN_DATA absent."; return 0; }
+  [ -n "$3" ] || { ligne "--solder attend le nom d'une entree."; return 0; }
+  migrer_ancien "$racine" "$donnees"
+  dossier="$(dossier_relance "$racine" "$donnees")"
+  nom="$(nom_entree "$3")"
+  if [ -f "$dossier/$nom.md" ] && mv -f "$dossier/$nom.md" "$dossier/$nom.joue.md" 2>/dev/null; then
+    ligne "Entree $nom soldee : marquee jouee sans etre lue."
+  else
+    ligne "Aucune entree $nom en attente."
+  fi
   return 0
 }
 
 # Imprime le prompt sur stdout, en clair, puis le marque joue.
-lire_relance() { # <racine> <donnees>
-  local racine="$1" donnees="$2" f j
+lire_relance() { # <racine> <donnees> [entree]
+  local racine="$1" donnees="$2" cible="$3" dossier nom f j dep reste dernier
   [ -n "$donnees" ] || { ligne "Aucun prompt de relance : CLAUDE_PLUGIN_DATA absent."; return 0; }
-  f="$(fichier_relance "$racine" "$donnees")"
-  j="$(fichier_relance "$racine" "$donnees" joue)"
-  if [ ! -f "$f" ]; then
-    if [ -f "$j" ]; then
-      ligne "Le dernier prompt de relance a deja ete joue ($(fraicheur_relance "$racine" "$j")). Il est dans $j."
-    else
-      ligne "Aucun prompt de relance range pour ce projet."
+  migrer_ancien "$racine" "$donnees"
+  dossier="$(dossier_relance "$racine" "$donnees")"
+  if [ -n "$cible" ]; then
+    nom="$(nom_entree "$cible")"
+    if [ ! -f "$dossier/$nom.md" ]; then
+      if [ -f "$dossier/$nom.joue.md" ]; then
+        ligne "Le prompt $nom a deja ete joue ($(fraicheur_relance "$racine" "$dossier/$nom.joue.md")). Il est dans $dossier/$nom.joue.md."
+      else
+        ligne "Aucun prompt $nom en attente."
+      fi
+      reste="$(en_attente "$dossier" | tr '\n' ' ' | sed 's/ $//')"
+      [ -n "$reste" ] && ligne "En attente : $reste."
+      return 0
     fi
-    return 0
+  else
+    nom="$(prochaine_entree "$dossier")"
+    if [ -z "$nom" ]; then
+      dernier="$(find "$dossier" -maxdepth 1 -type f -name '*.joue.md' 2>/dev/null | while IFS= read -r f; do
+                   printf '%s\t%s\n' "$(champ_tete "$f" ordre)" "$f"; done | sort -n | sed -n '$p' | cut -f2)"
+      if [ -n "$dernier" ]; then
+        ligne "Le dernier prompt de relance a deja ete joue ($(fraicheur_relance "$racine" "$dernier")). Il est dans $dernier."
+      else
+        ligne "Aucun prompt de relance range pour ce projet."
+      fi
+      return 0
+    fi
   fi
-  ligne "Prompt de relance $(fraicheur_relance "$racine" "$f")."
+  f="$dossier/$nom.md"
+  j="$dossier/$nom.joue.md"
+  dep="$(dependance_en_attente "$dossier" "$nom")"
+  [ -n "$dep" ] && ligne "Attention : $nom passe normalement apres $dep, qui attend encore."
+  ligne "Prompt de relance $nom $(fraicheur_relance "$racine" "$f")."
+  reste="$(en_attente "$dossier" | grep -vxF "$nom" | tr '\n' ' ' | sed 's/ $//')"
+  if [ -n "$reste" ]; then
+    ligne "Restent en attente : $reste. Chaque plan se joue dans sa propre session neuve."
+  fi
   SORTIE="${SORTIE}$(sed '1d' "$f")
 "
   mv -f "$f" "$j" 2>/dev/null
@@ -291,13 +511,18 @@ lire_relance() { # <racine> <donnees>
 
 main() {
   local mode=lire racine="" donnees="${CLAUDE_PLUGIN_DATA:-}" base top v ligne_version entree
-  local out rc nb na reprise d date_r msgs c l piliers=0
+  local out rc nb na reprise d date_r msgs c l piliers=0 plan="" apres="" cible=""
 
   while [ $# -gt 0 ]; do
     case "$1" in
       --ecrire-temoin)  mode=ecrire; shift ;;
       --ecrire-relance) mode=ecrire_relance; shift ;;
       --lire-relance)   mode=lire_relance; shift ;;
+      --lister-relance) mode=lister_relance; shift ;;
+      --solder)        mode=solder; cible="${2:-}"; if [ $# -ge 2 ]; then shift 2; else shift; fi ;;
+      --plan)          plan="${2:-}"; if [ $# -ge 2 ]; then shift 2; else shift; fi ;;
+      --apres)         apres="${2:-}"; if [ $# -ge 2 ]; then shift 2; else shift; fi ;;
+      --nom)           cible="${2:-}"; if [ $# -ge 2 ]; then shift 2; else shift; fi ;;
       --racine)        racine="${2:-}"; if [ $# -ge 2 ]; then shift 2; else shift; fi ;;
       --donnees)       donnees="${2:-}"; if [ $# -ge 2 ]; then shift 2; else shift; fi ;;
       *) shift ;;
@@ -342,8 +567,18 @@ main() {
 
   case "$mode" in
     ecrire)         ecrire_temoin "$racine" "$donnees"; return 0 ;;
-    ecrire_relance) ecrire_relance "$racine" "$donnees"; return 0 ;;
-    lire_relance)   lire_relance "$racine" "$donnees"; return 0 ;;
+    ecrire_relance) ecrire_relance "$racine" "$donnees" "$plan" "$apres"; return 0 ;;
+    lire_relance)   lire_relance "$racine" "$donnees" "$cible"; return 0 ;;
+    solder)         solder_relance "$racine" "$donnees" "$cible"; return 0 ;;
+    lister_relance)
+      if [ -z "$donnees" ]; then
+        ligne "Aucune file de relance : CLAUDE_PLUGIN_DATA absent."
+      else
+        annoncer_relance "$racine" "$donnees"
+        [ -n "$SORTIE" ] || ligne "Aucun prompt de relance en attente."
+      fi
+      return 0
+      ;;
   esac
 
   for c in CODEMAP.md TODOS.md CHANGELOG.md; do
