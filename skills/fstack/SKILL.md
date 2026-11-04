@@ -3,7 +3,7 @@ name: fstack
 description: "Tient la documentation de contexte d'un projet vraie et courte d'une session à l'autre, quel que soit son type ou sa taille. Six modes : init installe la convention, planifier écrit un plan sourcé et son prompt d'exécution, cloture range la session avant un redémarrage de contexte, relance dit où on en était, audit vérifie CLAUDE.md et AGENTS.md contre le code, migrer remet une ancienne convention à jour. Trois piliers CODEMAP.md, TODOS.md et CHANGELOG.md, plus docs/ et archives/, réglés par le bloc contexte:convention. Se déclenche sur : clôture, fin de session, avant de clear, reprends, où on en était, fais un plan, planifie, audite le CLAUDE.md, la doc gonfle, TODOS est trop long, archive ce qui est obsolète, doc vivante, migrer la convention, /fstack. Pas pour rédiger ou corriger un texte, c'est style-redaction."
 license: MIT
 metadata:
-  version: 1.0.0-rc.4
+  version: 1.0.0-rc.5
   hermes:
     tags: [documentation, session, housekeeping, changelog, codemap, context-budget, planning, audit]
 ---
